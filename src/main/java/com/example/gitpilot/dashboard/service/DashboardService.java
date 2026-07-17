@@ -1,5 +1,6 @@
 package com.example.gitpilot.dashboard.service;
 
+import com.example.gitpilot.ai.repository.AIReportRepository;
 import com.example.gitpilot.commit.dto.CommitResponse;
 import com.example.gitpilot.commit.entity.Commit;
 import com.example.gitpilot.commit.repository.CommitRepository;
@@ -8,6 +9,7 @@ import com.example.gitpilot.repository.entity.Repository;
 import com.example.gitpilot.repository.repository.RepositoryRepository;
 import com.example.gitpilot.user.entity.User;
 import com.example.gitpilot.user.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,13 +28,17 @@ public class DashboardService {
     private final UserRepository userRepository;
     private final RepositoryRepository repositoryRepository;
     private final CommitRepository commitRepository;
+    private final AIReportRepository aiReportRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DashboardService(UserRepository userRepository,
                             RepositoryRepository repositoryRepository,
-                            CommitRepository commitRepository) {
+                            CommitRepository commitRepository,
+                            AIReportRepository aiReportRepository) {
         this.userRepository = userRepository;
         this.repositoryRepository = repositoryRepository;
         this.commitRepository = commitRepository;
+        this.aiReportRepository = aiReportRepository;
     }
 
     private User getAuthenticatedUser(OAuth2User oauthUser) {
@@ -44,7 +50,28 @@ public class DashboardService {
 
     public List<RepositoryAnalyticsResponse> getRepositoriesAnalytics(OAuth2User oauthUser) {
         User user = getAuthenticatedUser(oauthUser);
-        return repositoryRepository.findRepositoryAnalyticsByUser(user);
+        List<RepositoryAnalyticsResponse> list = repositoryRepository.findRepositoryAnalyticsByUser(user);
+
+        for (RepositoryAnalyticsResponse resp : list) {
+            Repository repo = repositoryRepository.findById(resp.getId()).orElse(null);
+            if (repo != null) {
+                resp.setLastSyncedAt(repo.getLastSyncedAt());
+                resp.setLastSyncStatus(repo.getLastSyncStatus());
+            }
+
+            aiReportRepository.findFirstByRepositoryAndReportTypeOrderByGeneratedTimeDesc(repo, "FULL_REPORT")
+                    .ifPresent(report -> {
+                        try {
+                            Map<?, ?> data = objectMapper.readValue(report.getGeneratedReport(), Map.class);
+                            if (data.containsKey("healthScore") && data.get("healthScore") != null) {
+                                resp.setHealthScore(((Number) data.get("healthScore")).intValue());
+                            }
+                        } catch (Exception ignored) {}
+                        resp.setAiProviderUsed(report.getProvider());
+                        resp.setLastAIReportTime(report.getGeneratedTime());
+                    });
+        }
+        return list;
     }
 
     public RepositoryActivityResponse getRepositoryActivity(Long repositoryId) {

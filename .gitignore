@@ -34,4 +34,5 @@ build/
 
 ### Custom Secrets and Local Configurations ###
 .env
+.env.*
 application-local.properties

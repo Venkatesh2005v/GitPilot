@@ -38,6 +38,12 @@ public class Repository {
     @LastModifiedDate
     private LocalDateTime updatedAt;
 
+    private LocalDateTime lastSyncedAt;
+    private String lastSyncStatus;
+    private Long lastSyncDuration;
+    @Column(columnDefinition = "TEXT")
+    private String lastSyncError;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

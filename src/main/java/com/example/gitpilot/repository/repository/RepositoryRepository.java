@@ -16,6 +16,7 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     List<Repository> findByUser(User user);
     List<Repository> findByUserAndSelectedTrue(User user);
     Long countByUserAndSelectedTrue(User user);
+    List<Repository> findBySelectedTrue();
 
     @Query("SELECT MAX(r.updatedAt) FROM Repository r WHERE r.user = :user AND r.selected = true")
     LocalDateTime findLastSynchronizationByUser(@Param("user") User user);

@@ -23,9 +23,9 @@ public class CommitController {
     }
 
     @Operation(summary = "Sync repository commits", description = "Fetches and persists commit history for a selected repository from GitHub API")
-    @PostMapping("/repositories/{repositoryId}/sync-commits")
+    @PostMapping({"/repositories/{repositoryId}/sync-commits", "/repositories/{repositoryId}/sync"})
     public ResponseEntity<Map<String, String>> syncCommits(
-            @PathVariable Long repositoryId,
+            @PathVariable("repositoryId") Long repositoryId,
             @RegisteredOAuth2AuthorizedClient("github") OAuth2AuthorizedClient authorizedClient
     ) {
         int count = commitService.syncCommits(repositoryId, authorizedClient);
