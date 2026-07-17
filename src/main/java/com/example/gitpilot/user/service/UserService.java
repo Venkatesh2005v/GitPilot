@@ -38,12 +38,6 @@ public class UserService {
         user.setAvatarUrl(avatarUrl);
         user.setProfileUrl(profileUrl);
 
-        if (optionalUser.isEmpty()) {
-            user.setCreatedAt(LocalDateTime.now());
-        }
-
-        user.setUpdatedAt(LocalDateTime.now());
-
         User savedUser = userRepository.save(user);
         return new UserResponse(
                 savedUser.getUsername(),

@@ -83,7 +83,6 @@ public class RepositoryService {
                 repository.setDefaultBranch(repoDto.getDefaultBranch());
                 repository.setHtmlUrl(repoDto.getHtmlUrl());
                 repository.setPrivateRepo(repoDto.getIsPrivate());
-                repository.setUpdatedAt(LocalDateTime.now());
                 repository.setSelected(true);
             } else {
                 // Otherwise create a new Repository.
@@ -93,8 +92,6 @@ public class RepositoryService {
                 repository.setDefaultBranch(repoDto.getDefaultBranch());
                 repository.setHtmlUrl(repoDto.getHtmlUrl());
                 repository.setPrivateRepo(repoDto.getIsPrivate());
-                repository.setCreatedAt(LocalDateTime.now());
-                repository.setUpdatedAt(LocalDateTime.now());
                 repository.setSelected(true);
                 repository.setUser(user);
                 reposToSave.add(repository);

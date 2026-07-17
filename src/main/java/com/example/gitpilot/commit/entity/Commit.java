@@ -1,6 +1,6 @@
-package com.example.gitpilot.repository.entity;
+package com.example.gitpilot.commit.entity;
 
-import com.example.gitpilot.user.entity.User;
+import com.example.gitpilot.repository.entity.Repository;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -12,24 +12,36 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
+@Entity
+@Table(name = "commits")
 @Getter
 @Setter
-@Entity
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
-public class Repository {
+public class Commit {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(nullable = false, unique = true)
-    private Long githubRepoId;
-    @Column(nullable = false)
-    private String name;
-    private String defaultBranch;
-    private String htmlUrl;
-    private Boolean selected = false;
-    private Boolean privateRepo;
+
+    @Column(unique = true, nullable = false)
+    private String githubCommitSha;
+
+    @Column(columnDefinition = "TEXT")
+    private String message;
+
+    private String authorName;
+
+    private String authorEmail;
+
+    private LocalDateTime commitDate;
+
+    private String commitUrl;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "repository_id", nullable = false)
+    private Repository repository;
 
     @CreatedDate
     @Column(updatable = false)
@@ -37,8 +49,4 @@ public class Repository {
 
     @LastModifiedDate
     private LocalDateTime updatedAt;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
 }
