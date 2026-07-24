@@ -1,0 +1,4 @@
+-- Performance Optimization Indexes
+CREATE INDEX idx_repository_user_id ON repository(user_id);
+CREATE INDEX idx_commits_repository_id ON commits(repository_id);
+CREATE INDEX idx_ai_reports_repository_id ON ai_reports(repository_id);

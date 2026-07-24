@@ -34,5 +34,13 @@ build/
 
 ### Custom Secrets and Local Configurations ###
 .env
+.env.local
 .env.*
+!**/.env.example
 application-local.properties
+application-secrets.properties
+**/application-secrets.properties
+node_modules/
+dist/
+
+

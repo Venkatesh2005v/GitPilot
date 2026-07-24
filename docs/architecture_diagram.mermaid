@@ -1,0 +1,67 @@
+graph TD
+    %% Frontend Layer
+    subgraph Frontend [React SPA Client]
+        SPA[React App & Router]
+        DashboardView[Dashboard Page]
+        RepoOverviewView[Repository Overview Page]
+        AnalyticsView[Overall Analytics Page]
+        AIInsightsView[AI Insights Page]
+        SettingsView[Settings Page]
+
+        SPA --> DashboardView
+        SPA --> RepoOverviewView
+        SPA --> AnalyticsView
+        SPA --> AIInsightsView
+        SPA --> SettingsView
+    end
+
+    %% API Proxies & Network
+    SPA -- API Fetch Requests --> BackendController
+
+    %% Backend Controllers & Strategy Webhooks
+    subgraph Backend [Spring Boot Backend]
+        BackendController[REST Controllers]
+        SecurityConfig[Spring Security OAuth2]
+        
+        %% Webhook Strategy Routing
+        WebhookController[Webhook Controller]
+        StrategyRouter[Strategy Handler Routing]
+        PingHandler[PingWebhookHandler]
+        PushHandler[PushWebhookHandler]
+        RepositoryHandler[RepositoryWebhookHandler]
+        InstallationHandler[InstallationWebhookHandler]
+        PRHandler[PullRequestWebhookHandler]
+        
+        WebhookController --> StrategyRouter
+        StrategyRouter -->|supports Ping| PingHandler
+        StrategyRouter -->|supports Push| PushHandler
+        StrategyRouter -->|supports Repository| RepositoryHandler
+        StrategyRouter -->|supports Installation| InstallationHandler
+        StrategyRouter -->|supports Pull Request| PRHandler
+    end
+
+    %% Database & Cache Invalidation
+    subgraph DatabaseLayer [Persistence & Caching]
+        PostgreSQL[(PostgreSQL DB)]
+        AICache[(Concurrent In-Memory Cache)]
+    end
+    
+    PushHandler -->|Update commits / meta| PostgreSQL
+    PushHandler -->|Evict Cache| AICache
+
+    %% AI Gateway & Fallbacks
+    subgraph AIGateway [AI Gateway Failover Stack]
+        FailoverRoute{Failover Router}
+        Gemini[Gemini Provider]
+        Groq[Groq Provider]
+        OpenRouter[OpenRouter Provider]
+
+        FailoverRoute -->|Primary| Gemini
+        FailoverRoute -->|Fallback 1| Groq
+        FailoverRoute -->|Fallback 2| OpenRouter
+    end
+
+    RepoOverviewView -- Generate Insights --> FailoverRoute
+    AIInsightsView -- Fetch Reports --> FailoverRoute
+    FailoverRoute -->|Cache Result| AICache
+    FailoverRoute -->|Persist Reports| PostgreSQL
