@@ -58,14 +58,19 @@ public class WebhookService {
             log.error("Invalid signature header format. Header must start with 'sha256='");
             return false;
         }
-        String expectedSignature = signatureHeader.substring(7);
+        String expectedSignature = signatureHeader.substring(7).trim();
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             mac.init(secretKeySpec);
             byte[] rawHmac = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
             String computedSignature = HexFormat.of().formatHex(rawHmac);
-            return MessageDigest.isEqual(computedSignature.getBytes(StandardCharsets.UTF_8), expectedSignature.getBytes(StandardCharsets.UTF_8));
+
+            boolean matches = MessageDigest.isEqual(computedSignature.getBytes(StandardCharsets.UTF_8), expectedSignature.getBytes(StandardCharsets.UTF_8));
+            if (!matches) {
+                log.error("GitHub webhook signature verification failed.");
+            }
+            return matches;
         } catch (Exception e) {
             log.error("Error computing signature hash: {}", e.getMessage());
             return false;
