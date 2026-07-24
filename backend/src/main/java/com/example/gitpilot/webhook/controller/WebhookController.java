@@ -2,6 +2,7 @@ package com.example.gitpilot.webhook.controller;
 
 import com.example.gitpilot.webhook.handler.GithubWebhookHandler;
 import com.example.gitpilot.webhook.service.WebhookService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
@@ -54,13 +55,12 @@ public class WebhookController {
             // No matching handler found
             log.info("No matching handler found for GitHub webhook event: {}", eventType);
             return ResponseEntity.ok("Event '" + eventType + "' ignored (no handler configured)");
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | JsonProcessingException e) {
             log.error("Bad webhook payload request: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body("Invalid webhook payload: " + e.getMessage());
         } catch (Exception e) {
             log.error("Internal processing error during webhook handler: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing failed: " + e.getMessage());
         }
     }
 }
-
