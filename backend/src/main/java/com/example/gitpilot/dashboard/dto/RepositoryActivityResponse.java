@@ -18,4 +18,21 @@ public class RepositoryActivityResponse {
     private String latestCommitMessage;
     private String latestCommitAuthor;
     private LocalDateTime latestCommitDate;
+
+    // Sync status
+    private String syncStatus;       // Completed, Running, Failed, Never
+    private LocalDateTime lastSyncedAt;
+    private Long lastSyncDurationMs;
+    private Long uniqueContributorCount;
+    private Integer healthScore;
+
+    public RepositoryActivityResponse(String repositoryName, Long totalCommits, Long commitsLast7Days,
+                                       String latestCommitMessage, String latestCommitAuthor, LocalDateTime latestCommitDate) {
+        this.repositoryName = repositoryName;
+        this.totalCommits = totalCommits;
+        this.commitsLast7Days = commitsLast7Days;
+        this.latestCommitMessage = latestCommitMessage;
+        this.latestCommitAuthor = latestCommitAuthor;
+        this.latestCommitDate = latestCommitDate;
+    }
 }

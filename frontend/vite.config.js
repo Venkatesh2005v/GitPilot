@@ -27,6 +27,14 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true
       },
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
+      },
+      '/architecture': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
+      },
       '/github': {
         target: 'http://localhost:8080',
         changeOrigin: true
@@ -40,6 +48,10 @@ export default defineConfig({
         changeOrigin: true
       },
       '/logout': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
+      },
+      '/webhooks': {
         target: 'http://localhost:8080',
         changeOrigin: true
       }

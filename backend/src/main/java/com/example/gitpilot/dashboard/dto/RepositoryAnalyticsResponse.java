@@ -23,6 +23,13 @@ public class RepositoryAnalyticsResponse {
     private String aiProviderUsed;
     private LocalDateTime lastAIReportTime;
 
+    // Webhook status
+    private String webhookStatus; // "Connected" or "Missing"
+    private Long webhookId;
+    private String webhookPayloadUrl;
+    private Boolean webhookActive;
+    private LocalDateTime webhookLastDeliveryAt;
+
     public RepositoryAnalyticsResponse(Long id, String repositoryName, Long totalCommits, LocalDateTime lastCommitDate, Long uniqueContributorCount) {
         this.id = id;
         this.repositoryName = repositoryName;

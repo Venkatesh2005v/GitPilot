@@ -21,6 +21,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class AIService {
 
@@ -63,6 +66,7 @@ public class AIService {
         // 1. Try In-Memory Cache first
         CacheEntry entry = aiCacheService.get(repositoryId, "FULL_REPORT");
         if (entry != null) {
+            log.info("[AI] Cache hit for repositoryId={} reportType=FULL_REPORT", repositoryId);
             try {
                 Map<?, ?> data = objectMapper.readValue(entry.getContent(), Map.class);
                 return new ReportResult(data, entry.getProviderUsed(), entry.getModel(), entry.getFallbackUsed(), entry.getGeneratedTime());
@@ -79,7 +83,6 @@ public class AIService {
             if (dbReport.getGeneratedTime().plusHours(1).isAfter(LocalDateTime.now())) {
                 try {
                     Map<?, ?> data = objectMapper.readValue(dbReport.getGeneratedReport(), Map.class);
-                    // Update in-memory cache
                     aiCacheService.put(repositoryId, "FULL_REPORT", dbReport.getGeneratedReport(), dbReport.getProvider(), dbReport.getModel(), dbReport.getFallbackUsed());
                     return new ReportResult(data, dbReport.getProvider(), dbReport.getModel(), dbReport.getFallbackUsed(), dbReport.getGeneratedTime());
                 } catch (Exception ignored) {}
@@ -131,8 +134,24 @@ public class AIService {
                 commitFrequencyPerDay, repository.getUpdatedAt() != null ? repository.getUpdatedAt().toString() : "N/A"
         );
 
-        AIGatewayService.AIResult aiResult = aiGatewayService.generateInsightWithFailover(prompt);
-        String rawResult = aiResult.text.trim();
+        String providerUsed = "Google Gemini";
+        String modelUsed = "gemini-2.5-flash";
+        String fallbackUsed = "None";
+        String rawResult;
+
+        log.info("[AI] Cache miss for repositoryId={}. Generating fresh report via AI gateway.", repositoryId);
+
+        try {
+            AIGatewayService.AIResult aiResult = aiGatewayService.generateInsightWithFailover(prompt);
+            rawResult = aiResult.text != null ? aiResult.text.trim() : "";
+            providerUsed = aiResult.providerUsed;
+            modelUsed = aiResult.modelUsed;
+            fallbackUsed = aiResult.fallbackUsed;
+            log.info("[AI] Generation complete for repositoryId={} provider={} model={}", repositoryId, providerUsed, modelUsed);
+        } catch (Exception e) {
+            log.error("[AI] All providers failed for repositoryId={}: {}", repositoryId, e.getMessage());
+            rawResult = String.format("{\"healthScore\":0,\"strengths\":[],\"weaknesses\":[\"AI analysis unavailable\"],\"recommendations\":[\"Retry AI analysis when provider is available\"],\"summary\":\"AI analysis for %s is temporarily unavailable.\"}", repository.getName());
+        }
 
         if (rawResult.startsWith("```json")) {
             rawResult = rawResult.substring(7);
@@ -149,11 +168,11 @@ public class AIService {
             parsedData = objectMapper.readValue(rawResult, Map.class);
         } catch (Exception e) {
             parsedData = Map.of(
-                    "healthScore", 80,
-                    "strengths", List.of("Healthy repository structure"),
-                    "weaknesses", List.of("Limited recent activity metrics"),
-                    "recommendations", List.of("Maintain consistent commits"),
-                    "summary", "Repository has stable commit history with general consistency."
+                    "healthScore", 0,
+                    "strengths", List.of(),
+                    "weaknesses", List.of("AI response could not be parsed"),
+                    "recommendations", List.of("Retry AI analysis"),
+                    "summary", "AI analysis could not be completed for this repository."
             );
             try {
                 rawResult = objectMapper.writeValueAsString(parsedData);
@@ -162,29 +181,40 @@ public class AIService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        // Save to Database
-        AIReport report = new AIReport();
-        report.setRepository(repository);
-        report.setReportType("FULL_REPORT");
-        report.setProvider(aiResult.providerUsed);
-        report.setModel(aiResult.modelUsed);
-        report.setFallbackUsed(aiResult.fallbackUsed);
-        report.setGeneratedReport(rawResult);
-        report.setGeneratedTime(now);
-        aiReportRepository.save(report);
+        try {
+            AIReport report = new AIReport();
+            report.setRepository(repository);
+            report.setReportType("FULL_REPORT");
+            report.setProvider(providerUsed);
+            report.setModel(modelUsed);
+            report.setFallbackUsed(fallbackUsed);
+            report.setGeneratedReport(rawResult);
+            report.setGeneratedTime(now);
+            log.info("[AI] Saving AI report for repositoryId={} reportType=FULL_REPORT provider={}", repositoryId, providerUsed);
+            aiReportRepository.save(report);
+            log.info("[AI] Saved AI report for repository {}", repository.getName());
+        } catch (Exception e) {
+            log.error("[AI] Failed saving AI report for repositoryId={}: {}", repositoryId, e.getMessage(), e);
+        }
 
-        // Put in Cache
-        aiCacheService.put(repositoryId, "FULL_REPORT", rawResult, aiResult.providerUsed, aiResult.modelUsed, aiResult.fallbackUsed);
+        aiCacheService.put(repositoryId, "FULL_REPORT", rawResult, providerUsed, modelUsed, fallbackUsed);
 
-        return new ReportResult(parsedData, aiResult.providerUsed, aiResult.modelUsed, aiResult.fallbackUsed, now);
+        return new ReportResult(parsedData, providerUsed, modelUsed, fallbackUsed, now);
     }
 
     @SuppressWarnings("unchecked")
     public AIHealthResponse getHealth(Long repositoryId) {
         ReportResult report = generateOrFetchReport(repositoryId);
-        Integer healthScore = ((Number) report.data.get("healthScore")).intValue();
-        List<String> strengths = (List<String>) report.data.get("strengths");
-        List<String> weaknesses = (List<String>) report.data.get("weaknesses");
+        Object hs = report.data != null ? report.data.get("healthScore") : null;
+        Integer healthScore = hs instanceof Number ? ((Number) hs).intValue() : 0;
+
+        List<String> strengths = report.data != null && report.data.get("strengths") instanceof List
+                ? (List<String>) report.data.get("strengths")
+                : List.of();
+
+        List<String> weaknesses = report.data != null && report.data.get("weaknesses") instanceof List
+                ? (List<String>) report.data.get("weaknesses")
+                : List.of();
 
         return new AIHealthResponse(
                 healthScore,
@@ -194,13 +224,17 @@ public class AIService {
                 report.model,
                 report.fallbackUsed,
                 report.generatedTime
-            );
+        );
     }
 
     public AISummaryResponse getSummary(Long repositoryId) {
         ReportResult report = generateOrFetchReport(repositoryId);
+        String summary = report.data != null && report.data.get("summary") != null
+                ? (String) report.data.get("summary")
+                : "No AI summary available. Please retry analysis.";
+
         return new AISummaryResponse(
-                (String) report.data.get("summary"),
+                summary,
                 report.providerUsed,
                 report.model,
                 report.fallbackUsed,
@@ -211,7 +245,10 @@ public class AIService {
     @SuppressWarnings("unchecked")
     public AIRecommendationsResponse getRecommendations(Long repositoryId) {
         ReportResult report = generateOrFetchReport(repositoryId);
-        List<String> recommendations = (List<String>) report.data.get("recommendations");
+        List<String> recommendations = report.data != null && report.data.get("recommendations") instanceof List
+                ? (List<String>) report.data.get("recommendations")
+                : List.of();
+
         return new AIRecommendationsResponse(
                 recommendations,
                 report.providerUsed,

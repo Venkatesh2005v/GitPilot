@@ -2,6 +2,7 @@ package com.example.gitpilot.webhook.service;
 
 import com.example.gitpilot.ai.cache.AICacheService;
 import com.example.gitpilot.ai.repository.AIReportRepository;
+import com.example.gitpilot.ai.service.OnboardingGuideService;
 import com.example.gitpilot.commit.entity.Commit;
 import com.example.gitpilot.commit.repository.CommitRepository;
 import com.example.gitpilot.repository.entity.Repository;
@@ -33,6 +34,7 @@ public class WebhookService {
     private final CommitRepository commitRepository;
     private final AICacheService aiCacheService;
     private final AIReportRepository aiReportRepository;
+    private final OnboardingGuideService onboardingGuideService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${github.webhook-secret:}")
@@ -41,11 +43,13 @@ public class WebhookService {
     public WebhookService(RepositoryRepository repositoryRepository,
                           CommitRepository commitRepository,
                           AICacheService aiCacheService,
-                          AIReportRepository aiReportRepository) {
+                          AIReportRepository aiReportRepository,
+                          OnboardingGuideService onboardingGuideService) {
         this.repositoryRepository = repositoryRepository;
         this.commitRepository = commitRepository;
         this.aiCacheService = aiCacheService;
         this.aiReportRepository = aiReportRepository;
+        this.onboardingGuideService = onboardingGuideService;
     }
 
 
@@ -100,11 +104,12 @@ public class WebhookService {
 
         Repository repository = repoOpt.get();
         if (!Boolean.TRUE.equals(repository.getSelected())) {
-            log.info("Repository {} is not selected for tracking. Ignoring webhook.", repository.getName());
+            log.info("[WebhookEvent] Repository={} is not selected for tracking. Ignoring.", repository.getName());
             return;
         }
 
         long startTime = System.currentTimeMillis();
+        log.info("[WebhookEvent] Repository={} repositoryId={} Event=push Processing started", repository.getName(), repository.getId());
         repository.setLastSyncStatus("RUNNING");
         repositoryRepository.saveAndFlush(repository);
 
@@ -161,11 +166,14 @@ public class WebhookService {
                     addedCount++;
                 }
             }
-            log.info("Webhook processed: added {} commits for repository {}", addedCount, repository.getName());
+            log.info("[WebhookEvent] Repository={} Event=push Processing finished. Commits added={}", repository.getName(), addedCount);
 
             // 3. Invalidate AI Cache
             aiCacheService.evict(repository.getId());
             aiReportRepository.deleteByRepositoryAndReportType(repository, "FULL_REPORT");
+            aiReportRepository.deleteByRepositoryAndReportType(repository, "FULL_INTELLIGENCE");
+            onboardingGuideService.evictCache(repository.getId());
+            log.info("[WebhookEvent] Repository={} Cache invalidated (AI reports + onboarding)", repository.getName());
 
             // 4. Update Synchronization Metadata
             long duration = System.currentTimeMillis() - startTime;

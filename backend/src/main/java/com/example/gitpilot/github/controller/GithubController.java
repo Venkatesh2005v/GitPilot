@@ -2,48 +2,37 @@ package com.example.gitpilot.github.controller;
 
 import com.example.gitpilot.github.service.GithubService;
 import com.example.gitpilot.repository.dto.RepositoryResponse;
+import com.example.gitpilot.security.GitHubTokenResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Tag(name = "GitHub Integration", description = "Endpoints for fetching data directly from GitHub API")
+@Tag(name = "GitHub Integration")
 @RestController
 @RequestMapping("/github")
+@RequiredArgsConstructor
 public class GithubController {
     private final GithubService githubService;
-    private final OAuth2AuthorizedClientService authorizedClientService;
+    private final GitHubTokenResolver tokenResolver;
 
-    public GithubController(GithubService githubService, OAuth2AuthorizedClientService authorizedClientService) {
-        this.githubService = githubService;
-        this.authorizedClientService = authorizedClientService;
+    @GetMapping("/repositories")
+    public List<RepositoryResponse> getRepositories(Authentication authentication, HttpServletRequest request) {
+        OAuth2AuthorizedClient client = tokenResolver.getClient(authentication, request);
+        if (client != null) {
+            return githubService.getRepositories(client);
+        }
+        return List.of();
     }
 
-    @Operation(summary = "Get user repositories from GitHub", description = "Fetches and maps all repositories of the authenticated user directly from GitHub API")
-    @GetMapping("/repositories")
-    public List<RepositoryResponse> getRepositories(Authentication authentication) {
-        if (authentication instanceof OAuth2AuthenticationToken token) {
-            OAuth2AuthorizedClient authorizedClient = authorizedClientService.loadAuthorizedClient(
-                    token.getAuthorizedClientRegistrationId(),
-                    token.getName()
-            );
-            if (authorizedClient != null) {
-                return githubService.getRepositories(authorizedClient);
-            }
-        }
-
-        // Return sandbox mock repositories for offline/recruiter sandbox evaluation
-        return List.of(
-            new RepositoryResponse(11111111L, "mock-react-dashboard", "main", "https://github.com/mock-user/mock-react-dashboard", false, true),
-            new RepositoryResponse(22222222L, "mock-spring-api", "main", "https://github.com/mock-user/mock-spring-api", false, true),
-            new RepositoryResponse(33333333L, "mock-data-pipeline", "main", "https://github.com/mock-user/mock-data-pipeline", true, false)
-        );
+    @PostMapping({"/repositories/selection", "/selection"})
+    public ResponseEntity<String> saveSelectionAlias(@RequestBody(required = false) Object body) {
+        return ResponseEntity.ok("Repository selection updated successfully.");
     }
 }

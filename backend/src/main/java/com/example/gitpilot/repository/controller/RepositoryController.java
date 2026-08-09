@@ -2,49 +2,35 @@ package com.example.gitpilot.repository.controller;
 
 import com.example.gitpilot.repository.dto.RepositorySelectionRequest;
 import com.example.gitpilot.repository.service.RepositoryService;
-import io.swagger.v3.oas.annotations.Operation;
+import com.example.gitpilot.security.GitHubTokenResolver;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "Repository Management", description = "Endpoints for managing repository selections")
+@Tag(name = "Repository Management")
 @RestController
 @RequestMapping("/repositories")
+@RequiredArgsConstructor
 public class RepositoryController {
 
     private final RepositoryService repositoryService;
-    private final OAuth2AuthorizedClientService authorizedClientService;
+    private final GitHubTokenResolver tokenResolver;
 
-    public RepositoryController(RepositoryService repositoryService, OAuth2AuthorizedClientService authorizedClientService){
-        this.repositoryService = repositoryService;
-        this.authorizedClientService = authorizedClientService;
-    }
-
-    @Operation(summary = "Save repository selections", description = "Saves or updates user's repository selection preferences in the database")
-    @PostMapping("/select")
+    @PostMapping({"/select", "/selection"})
     public ResponseEntity<String> selectRepositories(
             @Valid @RequestBody RepositorySelectionRequest request,
             Authentication authentication,
-            @AuthenticationPrincipal OAuth2User user) {
+            @AuthenticationPrincipal OAuth2User user,
+            HttpServletRequest httpRequest) {
 
-        OAuth2AuthorizedClient authorizedClient = null;
-        if (authentication instanceof OAuth2AuthenticationToken token) {
-            authorizedClient = authorizedClientService.loadAuthorizedClient(
-                    token.getAuthorizedClientRegistrationId(),
-                    token.getName()
-            );
-        }
-
+        OAuth2AuthorizedClient authorizedClient = tokenResolver.getClient(authentication, httpRequest);
         repositoryService.saveSelectedRepositories(request, authorizedClient, user);
         return ResponseEntity.ok("Repository selection saved successfully.");
     }

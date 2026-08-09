@@ -22,6 +22,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     Optional<Commit> findFirstByRepositoryOrderByCommitDateDesc(Repository repository);
 
     Page<Commit> findByRepositoryOrderByCommitDateDesc(Repository repository, Pageable pageable);
+    List<Commit> findByRepositoryOrderByCommitDateDesc(Repository repository);
 
     @Query("SELECT COUNT(c) FROM Commit c WHERE c.repository.user = :user AND c.repository.selected = true")
     Long countCommitsByUser(@Param("user") User user);

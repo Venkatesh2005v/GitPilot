@@ -9,7 +9,10 @@ import com.example.gitpilot.repository.entity.Repository;
 import com.example.gitpilot.repository.repository.RepositoryRepository;
 import com.example.gitpilot.user.entity.User;
 import com.example.gitpilot.user.repository.UserRepository;
+import com.example.gitpilot.webhook.entity.RepositoryWebhook;
+import com.example.gitpilot.webhook.repository.RepositoryWebhookRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -19,9 +22,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 public class DashboardService {
 
@@ -29,27 +34,44 @@ public class DashboardService {
     private final RepositoryRepository repositoryRepository;
     private final CommitRepository commitRepository;
     private final AIReportRepository aiReportRepository;
+    private final RepositoryWebhookRepository webhookRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DashboardService(UserRepository userRepository,
-                            RepositoryRepository repositoryRepository,
-                            CommitRepository commitRepository,
-                            AIReportRepository aiReportRepository) {
+                             RepositoryRepository repositoryRepository,
+                             CommitRepository commitRepository,
+                             AIReportRepository aiReportRepository,
+                             RepositoryWebhookRepository webhookRepository) {
         this.userRepository = userRepository;
         this.repositoryRepository = repositoryRepository;
         this.commitRepository = commitRepository;
         this.aiReportRepository = aiReportRepository;
+        this.webhookRepository = webhookRepository;
     }
 
     private User getAuthenticatedUser(OAuth2User oauthUser) {
+        if (oauthUser == null || oauthUser.getAttributes() == null) {
+            return null;
+        }
         Map<String, Object> attributes = oauthUser.getAttributes();
-        Long githubId = ((Number) attributes.get("id")).longValue();
-        return userRepository.findByGithubId(githubId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with githubId: " + githubId));
+        Object idObj = attributes.get("id");
+        if (idObj == null) {
+            return null;
+        }
+        Long githubId = ((Number) idObj).longValue();
+        return userRepository.findByGithubId(githubId).orElse(null);
+    }
+
+    private Repository findRepositoryOrFallback(Long repositoryId) {
+        return repositoryRepository.findById(repositoryId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Repository not found with id: " + repositoryId));
     }
 
     public List<RepositoryAnalyticsResponse> getRepositoriesAnalytics(OAuth2User oauthUser) {
         User user = getAuthenticatedUser(oauthUser);
+        if (user == null) {
+            return List.of();
+        }
         List<RepositoryAnalyticsResponse> list = repositoryRepository.findRepositoryAnalyticsByUser(user);
         List<Repository> userRepos = repositoryRepository.findByUserAndSelectedTrue(user);
         Map<Long, Repository> repoMap = userRepos.stream()
@@ -62,24 +84,45 @@ public class DashboardService {
                 resp.setLastSyncStatus(repo.getLastSyncStatus());
             }
 
-            aiReportRepository.findFirstByRepositoryAndReportTypeOrderByGeneratedTimeDesc(repo, "FULL_REPORT")
+            aiReportRepository.findFirstByRepositoryAndReportTypeOrderByGeneratedTimeDesc(repo, "FULL_INTELLIGENCE")
+                    .or(() -> aiReportRepository.findFirstByRepositoryAndReportTypeOrderByGeneratedTimeDesc(repo, "FULL_REPORT"))
                     .ifPresent(report -> {
                         try {
                             Map<?, ?> data = objectMapper.readValue(report.getGeneratedReport(), Map.class);
-                            if (data.containsKey("healthScore") && data.get("healthScore") != null) {
-                                resp.setHealthScore(((Number) data.get("healthScore")).intValue());
+                            if (data.containsKey("healthScore")) {
+                                Object hs = data.get("healthScore");
+                                if (hs instanceof Number) {
+                                    resp.setHealthScore(((Number) hs).intValue());
+                                } else if (hs instanceof Map) {
+                                    Object overall = ((Map<?, ?>) hs).get("overallHealthScore");
+                                    if (overall instanceof Number) {
+                                        resp.setHealthScore(((Number) overall).intValue());
+                                    }
+                                }
                             }
                         } catch (Exception ignored) {}
                         resp.setAiProviderUsed(report.getProvider());
                         resp.setLastAIReportTime(report.getGeneratedTime());
                     });
+
+            // Populate webhook status
+            webhookRepository.findByRepositoryId(resp.getId()).ifPresentOrElse(
+                    webhook -> {
+                        resp.setWebhookStatus("Connected");
+                        resp.setWebhookId(webhook.getGithubWebhookId());
+                        resp.setWebhookPayloadUrl(webhook.getPayloadUrl());
+                        resp.setWebhookActive(webhook.getActive());
+                        resp.setWebhookLastDeliveryAt(webhook.getLastDeliveryAt());
+                    },
+                    () -> resp.setWebhookStatus("Missing")
+            );
         }
         return list;
     }
 
     public RepositoryActivityResponse getRepositoryActivity(Long repositoryId) {
-        Repository repository = repositoryRepository.findById(repositoryId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Repository not found with id: " + repositoryId));
+        log.debug("[RepositorySync] Fetching activity for repositoryId={}", repositoryId);
+        Repository repository = findRepositoryOrFallback(repositoryId);
 
         Long totalCommits = commitRepository.countByRepository(repository);
         LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
@@ -90,7 +133,7 @@ public class DashboardService {
         String latestCommitAuthor = latestCommit != null ? latestCommit.getAuthorName() : null;
         LocalDateTime latestCommitDate = latestCommit != null ? latestCommit.getCommitDate() : null;
 
-        return new RepositoryActivityResponse(
+        RepositoryActivityResponse response = new RepositoryActivityResponse(
                 repository.getName(),
                 totalCommits,
                 commitsLast7Days,
@@ -98,11 +141,21 @@ public class DashboardService {
                 latestCommitAuthor,
                 latestCommitDate
         );
+
+        // Enrich with sync status
+        String syncStatus = repository.getLastSyncStatus() != null ? repository.getLastSyncStatus() : "Never";
+        response.setSyncStatus(syncStatus);
+        response.setLastSyncedAt(repository.getLastSyncedAt());
+        response.setLastSyncDurationMs(repository.getLastSyncDuration());
+
+        List<ContributorResponse> contributors = commitRepository.findContributorsByRepository(repository);
+        response.setUniqueContributorCount((long) contributors.size());
+
+        return response;
     }
 
     public List<CommitResponse> getRepositoryCommits(Long repositoryId, int page, int size) {
-        Repository repository = repositoryRepository.findById(repositoryId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Repository not found with id: " + repositoryId));
+        Repository repository = findRepositoryOrFallback(repositoryId);
 
         Pageable pageable = PageRequest.of(page, size);
         Page<Commit> commitPage = commitRepository.findByRepositoryOrderByCommitDateDesc(repository, pageable);
@@ -121,6 +174,9 @@ public class DashboardService {
 
     public DashboardSummaryResponse getDashboardSummary(OAuth2User oauthUser) {
         User user = getAuthenticatedUser(oauthUser);
+        if (user == null) {
+            return new DashboardSummaryResponse(0L, 0L, 0L, "-", null);
+        }
 
         Long selectedRepositories = repositoryRepository.countByUserAndSelectedTrue(user);
         Long totalCommits = commitRepository.countCommitsByUser(user);
@@ -143,8 +199,7 @@ public class DashboardService {
     }
 
     public List<ContributorResponse> getRepositoryContributors(Long repositoryId) {
-        Repository repository = repositoryRepository.findById(repositoryId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Repository not found with id: " + repositoryId));
+        Repository repository = findRepositoryOrFallback(repositoryId);
 
         return commitRepository.findContributorsByRepository(repository);
     }

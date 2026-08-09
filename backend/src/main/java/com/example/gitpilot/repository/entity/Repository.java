@@ -1,6 +1,7 @@
 package com.example.gitpilot.repository.entity;
 
 import com.example.gitpilot.user.entity.User;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -44,6 +45,7 @@ public class Repository {
     @Column(columnDefinition = "TEXT")
     private String lastSyncError;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

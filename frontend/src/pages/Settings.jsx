@@ -1,22 +1,33 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { 
   GitPullRequest, 
   Save, 
   HelpCircle, 
-  CheckCircle, 
+  CheckCircle2, 
   AlertCircle,
   Copy,
   Lock,
-  Globe
+  Globe,
+  Monitor,
+  Terminal,
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
+import { ThemeToggle } from '../components/ThemeToggle';
+import { useTheme } from '../context/ThemeContext';
+import { Skeleton } from '../components/Skeleton';
 
 export function Settings() {
+  const { theme, effectiveTheme } = useTheme();
   const [gitRepos, setGitRepos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [alert, setAlert] = useState(null);
+  const [copied, setCopied] = useState(false);
 
-  // Fetch available repos from github
+  const webhookUrl = `${window.location.origin}/webhooks/github`;
+
   const fetchGithubRepos = async () => {
     setLoading(true);
     setAlert(null);
@@ -26,11 +37,12 @@ export function Settings() {
         const data = await response.json();
         setGitRepos(data);
       } else {
-        setAlert({ type: 'error', message: 'Failed to fetch repositories from GitHub. Verify OAuth tokens.' });
+        setGitRepos([]);
+        setAlert({ type: 'error', message: 'Failed to load repositories from GitHub. Please ensure you are authenticated.' });
       }
     } catch (e) {
-      console.error("Failed to query github repos:", e);
-      setAlert({ type: 'error', message: 'Network error. Backend is unreachable.' });
+      setGitRepos([]);
+      setAlert({ type: 'error', message: 'Network error loading repositories. Please check your connection.' });
     } finally {
       setLoading(false);
     }
@@ -53,7 +65,6 @@ export function Settings() {
     setSaving(true);
     setAlert(null);
     try {
-      // Find all githubRepoId where selected is true
       const selectedIds = gitRepos
         .filter(r => r.selected)
         .map(r => r.githubRepoId);
@@ -65,191 +76,198 @@ export function Settings() {
       });
 
       if (response.ok) {
-        setAlert({ type: 'success', message: 'Repository selection preferences saved successfully.' });
+        setAlert({ type: 'success', message: 'Repository tracking preferences saved successfully!' });
       } else {
-        const errText = await response.text();
-        setAlert({ type: 'error', message: `Failed to save selections: ${errText}` });
+        setAlert({ type: 'error', message: 'Failed to save repository preferences. Please try again.' });
       }
     } catch (e) {
-      console.error("Save selection failed:", e);
-      setAlert({ type: 'error', message: 'Network error saving selections.' });
+      setAlert({ type: 'error', message: 'Network error saving preferences. Please check your connection.' });
     } finally {
       setSaving(false);
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    // Visual indicator would be nice, but simple alert is robust
+  const handleCopyWebhook = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  // Determine current host for payload webhook URL instruction
-  const webhookUrl = `${window.location.origin}/webhooks/github`;
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <Skeleton height="100px" borderRadius="1.75rem" />
+        <div className="bento-grid">
+          <div className="bento-span-7"><Skeleton height="320px" borderRadius="1.75rem" /></div>
+          <div className="bento-span-5"><Skeleton height="320px" borderRadius="1.75rem" /></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="fade-in">
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.5rem', fontFamily: 'Outfit, sans-serif' }}>Settings</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Configure repository tracking selection preferences and real-time webhook sync.</p>
+    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="ambient-page-bg" style={{ padding: '0 0 3rem 0' }}>
+      
+      {/* Header Title */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+            <span className="badge badge-primary">SYSTEM PREFERENCES</span>
+            <span className="badge badge-teal">WEBHOOK INTEGRATION</span>
+          </div>
+          <h1 style={{ fontSize: '2.25rem', fontWeight: 800, fontFamily: 'Space Grotesk, sans-serif' }}>
+            Settings & Telemetry
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.925rem' }}>
+            Configure GitHub repository tracking preferences, push event webhooks, and theme appearance.
+          </p>
+        </div>
+
+        <button onClick={handleSaveSelection} className="btn btn-primary" disabled={saving}>
+          <Save size={16} />
+          <span>{saving ? 'Saving...' : 'Save Settings'}</span>
+        </button>
       </div>
 
-      {/* Alert banner */}
       {alert && (
-        <div className="card" style={{
-          borderColor: alert.type === 'success' ? 'var(--accent-green)' : 'var(--accent-red)',
-          backgroundColor: alert.type === 'success' ? 'var(--accent-green-glow)' : 'var(--accent-red-glow)',
-          padding: '1rem',
-          marginBottom: '1.5rem',
+        <div className="card-3xl" style={{ 
+          marginBottom: '2rem', 
+          padding: '1rem 1.5rem', 
+          backgroundColor: alert.type === 'error' ? 'var(--accent-red-bg)' : 'var(--accent-green-bg)',
+          borderColor: alert.type === 'error' ? 'var(--accent-red)' : 'var(--accent-green)',
           display: 'flex',
           alignItems: 'center',
           gap: '0.75rem'
         }}>
-          {alert.type === 'success' ? <CheckCircle size={18} style={{ color: 'var(--accent-green)' }} /> : <AlertCircle size={18} style={{ color: 'var(--accent-red)' }} />}
-          <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>{alert.message}</span>
+          <CheckCircle2 size={20} style={{ color: alert.type === 'error' ? 'var(--accent-red)' : 'var(--accent-green)' }} />
+          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{alert.message}</span>
         </div>
       )}
 
-      <div className="grid-cols-2">
+      {/* Bento Grid */}
+      <div className="bento-grid">
         
-        {/* Repo Selections Card */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', maxHeight: '620px' }}>
-          <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', fontFamily: 'Outfit, sans-serif' }}>Repository Selections</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', marginBottom: '1.25rem' }}>
-            Check repositories to sync and analyze metrics. Uncheck to stop tracking.
+        {/* Repository Tracking Selector (Span 7) */}
+        <motion.div whileHover={{ y: -4 }} className="card-3xl bento-span-7">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <GitPullRequest size={20} style={{ color: 'var(--accent-primary)' }} />
+              <span>Tracked Repositories</span>
+            </h3>
+            <span className="badge badge-primary">{gitRepos.filter(r => r.selected).length} ACTIVE</span>
+          </div>
+
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+            Select which connected GitHub repositories should be indexed for real-time telemetry and AI health analysis:
           </p>
 
-          {loading ? (
-            <div style={{ display: 'flex', flexGrow: 1, justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
-              <div className="pulse-indicator running" style={{ width: '20px', height: '20px' }}></div>
-            </div>
-          ) : gitRepos.length === 0 ? (
-            <div style={{ display: 'flex', flexGrow: 1, flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '200px', color: 'var(--text-muted)' }}>
-              <GitPullRequest size={24} style={{ marginBottom: '0.5rem' }} />
-              <p style={{ fontSize: '0.875rem' }}>No repositories found under your GitHub profile.</p>
-            </div>
-          ) : (
-            <>
-              <div className="settings-list" style={{ flexGrow: 1 }}>
-                {gitRepos.map(repo => (
-                  <div key={repo.githubRepoId} className="settings-item">
-                    <div>
-                      <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-                        {repo.name}
-                      </span>
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                        <span className="badge badge-outline" style={{ fontSize: '0.625rem', padding: '0.1rem 0.4rem' }}>
-                          Branch: {repo.defaultBranch || 'main'}
-                        </span>
-                        {repo.privateRepo ? (
-                          <span className="badge badge-danger" style={{ fontSize: '0.625rem', padding: '0.1rem 0.4rem', gap: '0.2rem' }}>
-                            <Lock size={8} /> Private
-                          </span>
-                        ) : (
-                          <span className="badge badge-success" style={{ fontSize: '0.625rem', padding: '0.1rem 0.4rem', gap: '0.2rem' }}>
-                            <Globe size={8} /> Public
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <label className="checkbox-container">
-                      <input 
-                        type="checkbox" 
-                        checked={!!repo.selected}
-                        onChange={() => handleCheckboxChange(repo.githubRepoId)}
-                      />
-                      <span className="custom-checkbox"></span>
-                    </label>
-                  </div>
-                ))}
-              </div>
-
-              <button 
-                onClick={handleSaveSelection} 
-                className="btn btn-primary"
-                disabled={saving}
-                style={{ width: '100%', padding: '0.75rem', gap: '0.5rem' }}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            {gitRepos.map((repo) => (
+              <label 
+                key={repo.githubRepoId}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.9rem 1.25rem',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: '1.25rem',
+                  border: repo.selected ? '1px solid var(--border-color-hover)' : '1px solid var(--border-color)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
               >
-                <Save size={16} />
-                <span>{saving ? 'Saving Choices...' : 'Save Selected Repositories'}</span>
-              </button>
-            </>
-          )}
-        </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <input 
+                    type="checkbox"
+                    checked={repo.selected || false}
+                    onChange={() => handleCheckboxChange(repo.githubRepoId)}
+                    style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                  />
+                  <div>
+                    <strong style={{ fontSize: '0.925rem', display: 'block', color: 'var(--text-primary)' }}>{repo.repositoryName || repo.fullName}</strong>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>GitHub ID: {repo.githubRepoId}</span>
+                  </div>
+                </div>
+                {repo.selected && <span className="badge badge-teal" style={{ fontSize: '0.7rem' }}>TRACKED</span>}
+              </label>
+            ))}
+          </div>
 
-        {/* Webhooks Setup Guide Card */}
-        <div className="card">
-          <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', fontFamily: 'Outfit, sans-serif' }}>GitHub Webhooks Configuration</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', marginBottom: '1.25rem' }}>
-            Set up real-time webhooks in your GitHub repository to update commit activities instantaneously.
-          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={handleSaveSelection} className="btn btn-primary" disabled={saving}>
+              <Save size={16} />
+              <span>Save Tracking Preferences</span>
+            </button>
+          </div>
+        </motion.div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontSize: '0.875rem' }}>
-            <div>
-              <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>1. Webhook Payload URL</strong>
-              <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                Expose GitPilot to the internet (e.g. using ngrok or localtunnel in development) and paste the URL into GitHub:
-              </span>
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}>
-                <span className="code-panel" style={{ flexGrow: 1, margin: 0, padding: '0.5rem' }}>
-                  {webhookUrl}
-                </span>
-                <button 
-                  onClick={() => copyToClipboard(webhookUrl)}
-                  className="btn btn-secondary"
-                  style={{ padding: '0.5rem', flexShrink: 0 }}
-                  title="Copy URL to clipboard"
-                >
-                  <Copy size={14} />
+        {/* GitHub Webhook Endpoint & Secret (Span 5) */}
+        <motion.div whileHover={{ y: -4 }} className="card-3xl bento-span-5" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Terminal size={20} style={{ color: 'var(--accent-teal)' }} />
+                <span>GitHub Push Webhook</span>
+              </h3>
+              <span className="badge badge-teal">LIVE LISTENER</span>
+            </div>
+
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.6 }}>
+              Configure your GitHub repository Webhooks to push commit events directly to GitPilot:
+            </p>
+
+            {/* Webhook Payload URL Box */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
+                Payload URL
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={webhookUrl}
+                  style={{
+                    flex: 1,
+                    padding: '0.65rem 1rem',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '1rem',
+                    color: 'var(--text-primary)',
+                    fontFamily: 'JetBrains Mono',
+                    fontSize: '0.8rem',
+                    outline: 'none'
+                  }}
+                />
+                <button onClick={handleCopyWebhook} className="btn btn-secondary" style={{ padding: '0.65rem 1rem' }}>
+                  <Copy size={16} />
+                  <span>{copied ? 'Copied!' : 'Copy'}</span>
                 </button>
               </div>
             </div>
 
-            <div>
-              <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>2. Content Type</strong>
-              <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                Set content type to:
-              </span>
-              <div className="code-panel" style={{ padding: '0.5rem', margin: '0.25rem 0' }}>
-                application/json
+            <div style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '1.15rem', border: '1px solid var(--border-color)', fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                <Zap size={14} style={{ color: 'var(--accent-primary)' }} />
+                <span>Webhook Event Configuration</span>
               </div>
-            </div>
-
-            <div>
-              <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>3. Secret Signature</strong>
-              <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                Specify the same secret defined in your environment variable:
-              </span>
-              <div className="code-panel" style={{ padding: '0.5rem', margin: '0.25rem 0' }}>
-                GITHUB_WEBHOOK_SECRET
-              </div>
-            </div>
-
-            <div>
-              <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>4. Which events to trigger?</strong>
-              <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                Select: <strong>"Just the push event"</strong>.
-              </span>
-            </div>
-
-            <div style={{
-              display: 'flex',
-              gap: '0.75rem',
-              padding: '0.75rem',
-              backgroundColor: 'var(--bg-secondary)',
-              borderRadius: '8px',
-              border: '1px solid var(--border-color)',
-              marginTop: '0.5rem'
-            }}>
-              <HelpCircle size={20} style={{ color: 'var(--accent-sky)', flexShrink: 0 }} />
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                <strong>Tip:</strong> In GitHub, navigate to your repository's <em>Settings &gt; Webhooks &gt; Add Webhook</em> to configure these options. Real-time synchronization starts immediately upon successful registration.
-              </p>
+              Select <strong>Push events</strong> and set Content type to <code>application/json</code>.
             </div>
           </div>
-        </div>
+
+          {/* Theme Selector Section */}
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem', marginTop: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <strong style={{ fontSize: '0.9rem', display: 'block', color: 'var(--text-primary)' }}>Interface Theme</strong>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Active: {effectiveTheme.toUpperCase()}</span>
+              </div>
+              <ThemeToggle />
+            </div>
+          </div>
+        </motion.div>
 
       </div>
-    </div>
+    </motion.div>
   );
 }

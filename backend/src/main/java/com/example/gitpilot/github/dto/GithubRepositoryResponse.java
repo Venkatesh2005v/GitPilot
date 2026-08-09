@@ -19,4 +19,6 @@ public class GithubRepositoryResponse {
     private Boolean isPrivate;
     @JsonProperty("html_url")
     private String htmlUrl;
+    @JsonProperty("language")
+    private String language;
 }

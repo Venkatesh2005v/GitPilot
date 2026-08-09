@@ -2,6 +2,8 @@ package com.example.gitpilot.commit.service;
 
 import com.example.gitpilot.repository.entity.Repository;
 import com.example.gitpilot.repository.repository.RepositoryRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
@@ -9,10 +11,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-import org.springframework.transaction.annotation.Transactional;
-
 @Component
 public class SyncScheduler {
+
+    private static final Logger log = LoggerFactory.getLogger(SyncScheduler.class);
 
     private final RepositoryRepository repositoryRepository;
     private final CommitService commitService;
@@ -26,11 +28,18 @@ public class SyncScheduler {
         this.authorizedClientService = authorizedClientService;
     }
 
-    // Every six hours (6 * 60 * 60 * 1000 ms)
+    // Scheduled synchronization every six hours
     @Scheduled(fixedRate = 6 * 60 * 60 * 1000, initialDelay = 10000)
-    @Transactional(readOnly = true)
     public void syncAllSelectedRepositories() {
-        List<Repository> selectedRepos = repositoryRepository.findBySelectedTrue();
+        List<Repository> selectedRepos;
+        try {
+            // Eagerly fetch User association via JOIN FETCH to avoid LazyInitializationException outside transactional boundaries
+            selectedRepos = repositoryRepository.findBySelectedTrueWithUser();
+        } catch (Exception e) {
+            log.error("Failed to fetch selected repositories for scheduled sync: {}", e.getMessage());
+            return;
+        }
+
         for (Repository repo : selectedRepos) {
             if (repo.getUser() == null) {
                 continue;
@@ -41,21 +50,21 @@ public class SyncScheduler {
                 continue;
             }
             
-            // Try to load authorized client by githubId first
-
-            String principalName = repo.getUser().getGithubId().toString();
-            OAuth2AuthorizedClient authorizedClient = authorizedClientService.loadAuthorizedClient("github", principalName);
-            if (authorizedClient == null) {
-                // Fallback to username
+            OAuth2AuthorizedClient authorizedClient = null;
+            if (repo.getUser().getGithubId() != null) {
+                String principalName = repo.getUser().getGithubId().toString();
+                authorizedClient = authorizedClientService.loadAuthorizedClient("github", principalName);
+            }
+            if (authorizedClient == null && repo.getUser().getUsername() != null) {
                 authorizedClient = authorizedClientService.loadAuthorizedClient("github", repo.getUser().getUsername());
             }
 
-            if (authorizedClient != null) {
-                try {
-                    commitService.syncCommits(repo.getId(), authorizedClient);
-                } catch (Exception ignored) {
-                    // Failures are tracked and stored per repository inside CommitService
-                }
+            // Execute each repository synchronization in its own isolated transaction
+            try {
+                commitService.syncCommits(repo.getId(), authorizedClient);
+            } catch (Exception e) {
+                log.error("Error during scheduled synchronization for repository id {}: {}", repo.getId(), e.getMessage());
+                // Single repository failure is isolated and does not abort remaining repositories
             }
         }
     }

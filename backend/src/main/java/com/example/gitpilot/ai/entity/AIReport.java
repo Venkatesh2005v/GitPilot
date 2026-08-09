@@ -1,6 +1,7 @@
 package com.example.gitpilot.ai.entity;
 
 import com.example.gitpilot.repository.entity.Repository;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -21,15 +22,16 @@ public class AIReport {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id", nullable = false)
     private Repository repository;
 
     @Column(nullable = false)
-    private String reportType; // e.g. FULL_REPORT, HEALTH, SUMMARY, RECOMMENDATIONS
+    private String reportType;
 
     @Column(nullable = false)
-    private String provider; // e.g. Google Gemini, Groq, OpenRouter
+    private String provider;
 
     @Column(nullable = false)
     private String model;
@@ -37,7 +39,7 @@ public class AIReport {
     private String fallbackUsed;
 
     @Column(columnDefinition = "TEXT", nullable = false)
-    private String generatedReport; // JSON content string
+    private String generatedReport;
 
     @Column(nullable = false)
     private LocalDateTime generatedTime;

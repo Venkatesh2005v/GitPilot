@@ -8,6 +8,12 @@ public class ForwardController {
 
     @GetMapping(value = {
         "/dashboard",
+        "/journey",
+        "/knowledge",
+        "/dna",
+        "/timeline",
+        "/onboarding",
+        "/recommendations",
         "/analytics",
         "/insights",
         "/settings",

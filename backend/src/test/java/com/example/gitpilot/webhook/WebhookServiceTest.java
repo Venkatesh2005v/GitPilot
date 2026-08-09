@@ -14,7 +14,7 @@ class WebhookServiceTest {
 
     @BeforeEach
     void setUp() {
-        webhookService = new WebhookService(null, null, null, null);
+        webhookService = new WebhookService(null, null, null, null, null);
     }
 
 

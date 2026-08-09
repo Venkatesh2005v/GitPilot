@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { GitBranch, Settings, Bell, RefreshCw } from 'lucide-react';
+import { GitBranch, Settings } from 'lucide-react';
+import { ThemeToggle } from './ThemeToggle';
 
 export function TopNav({ user, selectedRepoId, setSelectedRepoId }) {
   const navigate = useNavigate();
@@ -13,6 +14,16 @@ export function TopNav({ user, selectedRepoId, setSelectedRepoId }) {
       if (response.ok) {
         const data = await response.json();
         setRepos(data);
+        // If selectedRepoId is empty or not in the list, default to first tracked repo
+        if (data.length > 0) {
+          const storedId = localStorage.getItem('gitpilot_selected_repo_id');
+          const isValidStored = storedId && data.some(r => r.id.toString() === storedId);
+          const defaultId = isValidStored ? storedId : data[0].id.toString();
+          if (!selectedRepoId || !data.some(r => r.id.toString() === selectedRepoId)) {
+            setSelectedRepoId(defaultId);
+            localStorage.setItem('gitpilot_selected_repo_id', defaultId);
+          }
+        }
       }
     } catch (e) {
       console.error("Failed to load repositories in navbar:", e);
@@ -21,63 +32,79 @@ export function TopNav({ user, selectedRepoId, setSelectedRepoId }) {
 
   useEffect(() => {
     fetchTrackedRepos();
-  }, [location.pathname]); // refetch when page changes to ensure new selections appear
+  }, [location.pathname]);
 
-  // Sync state drop-down with URL path if on details page
   useEffect(() => {
     const match = location.pathname.match(/^\/repositories\/(\d+)/);
     if (match) {
-      setSelectedRepoId(match[1]);
-    } else {
-      setSelectedRepoId('');
+      const urlId = match[1];
+      if (urlId !== selectedRepoId) {
+        setSelectedRepoId(urlId);
+        localStorage.setItem('gitpilot_selected_repo_id', urlId);
+      }
     }
-  }, [location.pathname, setSelectedRepoId]);
+  }, [location.pathname, selectedRepoId, setSelectedRepoId]);
 
   const handleRepoChange = (e) => {
     const id = e.target.value;
-    setSelectedRepoId(id);
     if (id) {
-      navigate(`/repositories/${id}`);
-    } else {
-      navigate('/dashboard');
+      setSelectedRepoId(id);
+      localStorage.setItem('gitpilot_selected_repo_id', id);
+      if (location.pathname.startsWith('/repositories/')) {
+        navigate(`/repositories/${id}`);
+      }
     }
   };
 
-  // Determine page title
   const getPageTitle = () => {
-    if (location.pathname === '/dashboard') return 'Dashboard';
-    if (location.pathname === '/analytics') return 'Overall Analytics';
+    if (location.pathname === '/dashboard') return 'Dashboard Overview';
+    if (location.pathname === '/onboarding') return 'Developer Onboarding';
+    if (location.pathname === '/recommendations') return 'AI Recommendations';
+    if (location.pathname === '/architecture') return 'Architecture View';
+    if (location.pathname === '/team-intelligence') return 'Team Intelligence';
+    if (location.pathname === '/settings') return 'Settings & Webhooks';
+    if (location.pathname === '/analytics') return 'Repository Analytics';
     if (location.pathname === '/insights') return 'AI Insights';
-    if (location.pathname === '/settings') return 'Settings';
     if (location.pathname.startsWith('/repositories/')) {
       const activeRepo = repos.find(r => r.id.toString() === selectedRepoId);
-      return activeRepo ? activeRepo.repositoryName : 'Repository Details';
+      return activeRepo ? activeRepo.repositoryName : 'Repository Overview';
     }
     return 'GitPilot';
   };
 
   return (
     <header style={{
-      height: 'var(--header-height)',
-      backgroundColor: 'var(--bg-primary)',
+      height: '76px',
+      backgroundColor: 'var(--bg-topnav)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
       borderBottom: '1px solid var(--border-color)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '0 2rem',
+      padding: '0 2.25rem',
       position: 'sticky',
       top: 0,
       zIndex: 90
     }}>
-      {/* Title / Repo Selector */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, fontFamily: 'Outfit, sans-serif' }}>
+      {/* Title & Repo Quick Selector */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1.75rem' }}>
+        <h2 style={{ fontSize: '1.35rem', fontWeight: 800, fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '-0.02em' }}>
           {getPageTitle()}
         </h2>
 
         {repos.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--bg-card)', padding: '0.25rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <GitBranch size={14} style={{ color: 'var(--accent-sky)' }} />
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            backgroundColor: 'var(--bg-card)',
+            padding: '0.45rem 1rem',
+            borderRadius: '9999px',
+            border: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <GitBranch size={15} style={{ color: 'var(--accent-primary)' }} />
             <select
               value={selectedRepoId}
               onChange={handleRepoChange}
@@ -86,18 +113,14 @@ export function TopNav({ user, selectedRepoId, setSelectedRepoId }) {
                 border: 'none',
                 color: 'var(--text-primary)',
                 fontFamily: 'Inter, sans-serif',
-                fontSize: '0.8125rem',
-                fontWeight: 500,
+                fontSize: '0.85rem',
+                fontWeight: 600,
                 outline: 'none',
-                cursor: 'pointer',
-                paddingRight: '0.5rem'
+                cursor: 'pointer'
               }}
             >
-              <option value="" style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)' }}>
-                -- Quick Repo Jump --
-              </option>
               {repos.map(r => (
-                <option key={r.id} value={r.id.toString()} style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
+                <option key={r.id} value={r.id.toString()} style={{ background: 'var(--bg-card-solid)', color: 'var(--text-primary)' }}>
                   {r.repositoryName}
                 </option>
               ))}
@@ -106,27 +129,20 @@ export function TopNav({ user, selectedRepoId, setSelectedRepoId }) {
         )}
       </div>
 
-      {/* Quick Actions */}
+      {/* Right Controls: Theme Toggle & Settings */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        {/* Sync Settings Link */}
+        <ThemeToggle />
+
         <Link 
           to="/settings" 
+          className="btn btn-secondary"
           style={{
-            color: 'var(--text-secondary)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '36px',
-            height: '36px',
-            borderRadius: '8px',
-            border: '1px solid var(--border-color)',
-            backgroundColor: 'var(--bg-card)',
-            transition: 'all 0.15s ease',
-            textDecoration: 'none'
+            padding: '0.55rem',
+            borderRadius: '9999px'
           }}
-          title="Configure webhooks and repositories"
+          title="Configure webhooks and settings"
         >
-          <Settings size={16} />
+          <Settings size={17} />
         </Link>
       </div>
     </header>
