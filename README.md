@@ -13,43 +13,6 @@ The project is structured as a full-stack monorepo:
 
 ---
 
-## 🏗️ Architecture Overview
-
-The system architecture features a **Strategy Pattern** for Webhook handling and a **Failover Chain** for AI insights:
-
-```mermaid
-graph TD
-    User([Developer]) -->|OAuth2 Login| SPA[React Frontend]
-    SPA -->|API Requests| BackendController[Spring Boot RestControllers]
-    
-    %% Webhooks
-    Github[GitHub Webhooks] -->|POST /webhooks/github| WebhookController[WebhookController]
-    WebhookController -->|Signature HMAC Validation| WebhookService[WebhookService]
-    WebhookService -->|Strategy Routing| Handlers[Strategy Event Handlers]
-    Handlers -->|supports Push| PushHandler[PushWebhookHandler]
-    Handlers -->|supports Ping| PingHandler[PingWebhookHandler]
-    
-    PushHandler -->|Sync Commits / Metadata| DB[(PostgreSQL Database)]
-    PushHandler -->|Evict Cache| Cache[(In-Memory Cache)]
-
-    %% AI Gateway
-    BackendController -->|Generate AI Report| AIService[AIService]
-    AIService -->|1. Lookup| Cache
-    Cache -->|Miss| DBReport[DB AI Report Lookup]
-    DBReport -->|Miss| AIGateway[AI Gateway Service]
-    
-    AIGateway -->|Try Primary| Gemini[Google Gemini Provider]
-    AIGateway -.->|Fallback 1| Groq[Groq Provider]
-    AIGateway -.->|Fallback 2| OpenRouter[OpenRouter Provider]
-    
-    Gemini -->|Save| Cache
-    Groq -->|Save| Cache
-    OpenRouter -->|Save| Cache
-```
-
-Detailed architecture diagrams are located in [`/docs/architecture_diagram.mermaid`](file:///c:/Users/VENKATESH/Downloads/gitpilot/docs/architecture_diagram.mermaid).
-
----
 
 ## 🛠️ Environment Configuration
 
