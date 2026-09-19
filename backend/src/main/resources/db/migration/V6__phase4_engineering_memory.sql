@@ -2,7 +2,7 @@
 
 CREATE TABLE IF NOT EXISTS repository_journeys (
     id BIGSERIAL PRIMARY KEY,
-    repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+    repository_id BIGINT NOT NULL REFERENCES repository(id) ON DELETE CASCADE,
     milestone_name VARCHAR(255) NOT NULL,
     milestone_category VARCHAR(100),
     icon_name VARCHAR(100),
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS repository_journeys (
 
 CREATE TABLE IF NOT EXISTS engineering_timelines (
     id BIGSERIAL PRIMARY KEY,
-    repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+    repository_id BIGINT NOT NULL REFERENCES repository(id) ON DELETE CASCADE,
     time_period VARCHAR(100) NOT NULL,
     milestone_title VARCHAR(255) NOT NULL,
     summary TEXT NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS engineering_timelines (
 
 CREATE TABLE IF NOT EXISTS repository_dnas (
     id BIGSERIAL PRIMARY KEY,
-    repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+    repository_id BIGINT NOT NULL REFERENCES repository(id) ON DELETE CASCADE,
     activity_level INT NOT NULL,
     repository_size INT NOT NULL,
     architecture_quality INT NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS repository_dnas (
 
 CREATE TABLE IF NOT EXISTS onboarding_steps (
     id BIGSERIAL PRIMARY KEY,
-    repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+    repository_id BIGINT NOT NULL REFERENCES repository(id) ON DELETE CASCADE,
     step_order INT NOT NULL,
     module_name VARCHAR(255) NOT NULL,
     title VARCHAR(255) NOT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS onboarding_steps (
 
 CREATE TABLE IF NOT EXISTS knowledge_nodes (
     id BIGSERIAL PRIMARY KEY,
-    repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+    repository_id BIGINT NOT NULL REFERENCES repository(id) ON DELETE CASCADE,
     node_key VARCHAR(100) NOT NULL,
     name VARCHAR(255) NOT NULL,
     category VARCHAR(100),
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS knowledge_nodes (
 
 CREATE TABLE IF NOT EXISTS knowledge_edges (
     id BIGSERIAL PRIMARY KEY,
-    repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+    repository_id BIGINT NOT NULL REFERENCES repository(id) ON DELETE CASCADE,
     source_node_key VARCHAR(100) NOT NULL,
     target_node_key VARCHAR(100) NOT NULL,
     relationship_type VARCHAR(100),
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS knowledge_edges (
 
 CREATE TABLE IF NOT EXISTS engineering_decisions (
     id BIGSERIAL PRIMARY KEY,
-    repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+    repository_id BIGINT NOT NULL REFERENCES repository(id) ON DELETE CASCADE,
     decision_title VARCHAR(255) NOT NULL,
     rationale TEXT NOT NULL,
     status VARCHAR(50) DEFAULT 'ACCEPTED',
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS engineering_decisions (
 
 CREATE TABLE IF NOT EXISTS contextual_recommendations (
     id BIGSERIAL PRIMARY KEY,
-    repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+    repository_id BIGINT NOT NULL REFERENCES repository(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     category VARCHAR(100),
     priority VARCHAR(50),
