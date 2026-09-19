@@ -16,4 +16,5 @@ public class RepositoryResponse {
     private String htmlUrl;
     private Boolean privateRepo;
     private Boolean selected;
+    private String fullName;
 }

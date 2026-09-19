@@ -186,7 +186,10 @@ export function Settings() {
                     style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
                   />
                   <div>
-                    <strong style={{ fontSize: '0.925rem', display: 'block', color: 'var(--text-primary)' }}>{repo.repositoryName || repo.fullName}</strong>
+                    <strong style={{ fontSize: '0.925rem', display: 'block', color: 'var(--text-primary)' }}>{repo.name}</strong>
+                    {repo.fullName && (
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', display: 'block' }}>{repo.fullName}</span>
+                    )}
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>GitHub ID: {repo.githubRepoId}</span>
                   </div>
                 </div>

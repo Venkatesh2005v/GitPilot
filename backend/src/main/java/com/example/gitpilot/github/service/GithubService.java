@@ -36,7 +36,8 @@ public class GithubService {
                             repo.getDefaultBranch(),
                             repo.getHtmlUrl(),
                             repo.getIsPrivate(),
-                            selected
+                            selected,
+                            repo.getFullName()
                     );
                 })
                 .toList();
