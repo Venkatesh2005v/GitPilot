@@ -94,8 +94,17 @@ public class RepositoryService {
         for (GithubRepositoryResponse repoDto : selectedRepos) {
             Repository repository = repoMap.get(repoDto.getId());
 
+            String fullName = repoDto.getFullName() != null
+                    ? repoDto.getFullName()
+                    : repoDto.getName();
+            String owner = fullName != null && fullName.contains("/")
+                    ? fullName.substring(0, fullName.indexOf('/'))
+                    : "unknown";
+
             if (repository != null) {
                 repository.setName(repoDto.getFullName() != null ? repoDto.getFullName() : repoDto.getName());
+                repository.setFullName(fullName);
+                repository.setOwner(owner);
                 repository.setDefaultBranch(repoDto.getDefaultBranch());
                 repository.setHtmlUrl(repoDto.getHtmlUrl());
                 repository.setPrivateRepo(repoDto.getIsPrivate());
@@ -106,6 +115,8 @@ public class RepositoryService {
                 repository = new Repository();
                 repository.setGithubRepoId(repoDto.getId());
                 repository.setName(repoDto.getFullName() != null ? repoDto.getFullName() : repoDto.getName());
+                repository.setFullName(fullName);
+                repository.setOwner(owner);
                 repository.setDefaultBranch(repoDto.getDefaultBranch());
                 repository.setHtmlUrl(repoDto.getHtmlUrl());
                 repository.setPrivateRepo(repoDto.getIsPrivate());
