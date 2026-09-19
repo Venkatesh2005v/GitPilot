@@ -4,8 +4,11 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Build to the standard local `dist/` directory so Vercel can deploy the frontend
+  // independently. (Previously this emitted into the backend's static folder for the
+  // combined local setup; that is no longer needed for the split deployment.)
   build: {
-    outDir: '../backend/src/main/resources/static',
+    outDir: 'dist',
     emptyOutDir: true,
   },
   server: {

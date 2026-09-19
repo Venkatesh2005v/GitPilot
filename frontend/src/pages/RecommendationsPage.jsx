@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Zap, AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { TopLoadingBar, RepositoryLoader } from '../components/RepositoryLoader';
+import { apiFetch } from '../utils/apiUtils';
 
 export function RecommendationsPage({ selectedRepoId }) {
   const [recs, setRecs] = useState([]);
@@ -15,7 +16,7 @@ export function RecommendationsPage({ selectedRepoId }) {
     setRecs([]);
     setLoading(true);
     try {
-      const res = await fetch(`/api/memory/${selectedRepoId}/recommendations`, { signal });
+      const res = await apiFetch(`/api/memory/${selectedRepoId}/recommendations`, { signal });
       if (res.ok) {
         const data = await res.json();
         setRecs(data);

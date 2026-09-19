@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, BookOpen, ShieldCheck, Settings, LogOut, ChevronLeft, ChevronRight, Sparkles, Network, Users } from 'lucide-react';
+import { apiUrl } from '../utils/apiUtils';
 
 export function Sidebar({ user }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -144,7 +145,7 @@ export function Sidebar({ user }) {
         )}
         {!collapsed && (
           <button 
-            onClick={() => window.location.href = '/logout'}
+            onClick={() => window.location.href = apiUrl('/logout')}
             className="btn btn-ghost"
             style={{ padding: '0.4rem', borderRadius: '0.65rem' }}
             title="Log out"

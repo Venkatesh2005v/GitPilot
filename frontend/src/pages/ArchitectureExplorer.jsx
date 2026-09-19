@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Network, GitMerge, Layers, Code2, RefreshCw, ArrowRight, Info } from 'lucide-react';
 import { TopLoadingBar, RepositoryLoader } from '../components/RepositoryLoader';
 import { ArchitectureGraph } from '../components/ArchitectureGraph';
+import { apiFetch } from '../utils/apiUtils';
 
 export function ArchitectureExplorer({ selectedRepoId }) {
   const [activeTab, setActiveTab] = useState('callgraph');
@@ -16,8 +17,8 @@ export function ArchitectureExplorer({ selectedRepoId }) {
     setLoading(true);
     try {
       const [flowRes, intelRes] = await Promise.all([
-        fetch(`/api/architecture/api-flows/${selectedRepoId}`, { signal }),
-        fetch(`/ai/repositories/${selectedRepoId}/intelligence`, { signal })
+        apiFetch(`/api/architecture/api-flows/${selectedRepoId}`, { signal }),
+        apiFetch(`/ai/repositories/${selectedRepoId}/intelligence`, { signal })
       ]);
       if (flowRes.ok) {
         const ct = flowRes.headers.get('content-type');
@@ -38,7 +39,7 @@ export function ArchitectureExplorer({ selectedRepoId }) {
     if (!selectedRepoId) return;
     setAnalyzing(true);
     try {
-      await fetch(`/api/architecture/code-graph/${selectedRepoId}/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      await apiFetch(`/api/architecture/code-graph/${selectedRepoId}/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       const controller = new AbortController();
       await fetchData(controller.signal);
     } catch (e) {}

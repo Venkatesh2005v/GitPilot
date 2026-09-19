@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, RefreshCw, CheckCircle2, Code2, Layers, Cpu, Sparkles, FileText, ArrowRight } from 'lucide-react';
 import { RepositoryLoader, TopLoadingBar, AnimatedCard } from '../components/RepositoryLoader';
+import { getSummaryText, apiFetch } from '../utils/apiUtils';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -34,7 +35,7 @@ export function OnboardingPage({ selectedRepoId }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/ai/repositories/${repoId}/intelligence`, { signal });
+      const res = await apiFetch(`/ai/repositories/${repoId}/intelligence`, { signal });
       if (res.ok) {
         const data = await res.json();
         setReport(data);
@@ -54,7 +55,7 @@ export function OnboardingPage({ selectedRepoId }) {
     setRegenerating(true);
     setReport(null);
     try {
-      const res = await fetch(`/ai/repositories/${repoId}/intelligence/refresh`, { method: 'POST' });
+      const res = await apiFetch(`/ai/repositories/${repoId}/intelligence/refresh`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         setReport(data);
@@ -151,11 +152,11 @@ export function OnboardingPage({ selectedRepoId }) {
                 </h2>
               </div>
               <p style={{ fontSize: '1.05rem', color: 'var(--text-primary)', lineHeight: 1.7, marginBottom: '1rem' }}>
-                {report.projectPurpose || report.summary?.projectPurpose || ''}
+                {report.projectPurpose || getSummaryText(report) || ''}
               </p>
-              {(report.highLevelDescription || report.summary?.mainFunctionality) && (
+              {(report.highLevelDescription || report.readmeSummary?.architectureSummary || report.commitSummary?.highLevelSummary) && (
                 <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
-                  {report.highLevelDescription || report.summary?.mainFunctionality}
+                  {report.highLevelDescription || report.readmeSummary?.architectureSummary || report.commitSummary?.highLevelSummary}
                 </p>
               )}
             </motion.div>

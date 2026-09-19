@@ -17,6 +17,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { apiUrl } from '../utils/apiUtils';
 
 export function LandingPage() {
   const [activeTab, setActiveTab] = useState('health');
@@ -83,7 +84,7 @@ export function LandingPage() {
             <ThemeToggle />
 
             <button
-              onClick={() => window.location.href = '/oauth2/authorization/github'}
+              onClick={() => window.location.href = apiUrl('/oauth2/authorization/github')}
               className="btn btn-primary"
               style={{ fontSize: '0.85rem' }}
             >
@@ -155,7 +156,7 @@ export function LandingPage() {
             style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '4rem' }}
           >
             <button
-              onClick={() => window.location.href = '/oauth2/authorization/github'}
+              onClick={() => window.location.href = apiUrl('/oauth2/authorization/github')}
               className="btn btn-primary"
               style={{ padding: '0.9rem 2rem', fontSize: '1rem', borderRadius: '1.25rem' }}
             >
@@ -544,7 +545,7 @@ export function LandingPage() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span className="badge badge-teal">AI Analysis Active</span>
-              <button onClick={() => window.location.href = '/oauth2/authorization/github'} className="btn btn-ghost" style={{ fontSize: '0.8rem', gap: '0.25rem' }}>
+              <button onClick={() => window.location.href = apiUrl('/oauth2/authorization/github')} className="btn btn-ghost" style={{ fontSize: '0.8rem', gap: '0.25rem' }}>
                 <span>Inspect Repository</span>
                 <ArrowRight size={14} />
               </button>
@@ -571,7 +572,7 @@ export function LandingPage() {
 
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
-              onClick={() => window.location.href = '/oauth2/authorization/github'}
+              onClick={() => window.location.href = apiUrl('/oauth2/authorization/github')}
               className="btn btn-primary"
               style={{ padding: '0.9rem 2.25rem', fontSize: '1rem', borderRadius: '1.25rem' }}
             >

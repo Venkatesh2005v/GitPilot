@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, Sparkles, BookOpen, Cpu, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { apiFetch } from '../utils/apiUtils';
 
 export function KnowledgeSearchBar({ selectedRepoId }) {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export function KnowledgeSearchBar({ selectedRepoId }) {
     setLoading(true);
     try {
       const repoId = selectedRepoId || 1;
-      const res = await fetch(`/api/memory/${repoId}/search?query=${encodeURIComponent(val)}`);
+      const res = await apiFetch(`/api/memory/${repoId}/search?query=${encodeURIComponent(val)}`);
       if (res.ok) {
         const data = await res.json();
         setResults(data.items || []);

@@ -17,6 +17,7 @@ import {
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useTheme } from '../context/ThemeContext';
 import { Skeleton } from '../components/Skeleton';
+import { apiFetch } from '../utils/apiUtils';
 
 export function Settings() {
   const { theme, effectiveTheme } = useTheme();
@@ -32,7 +33,7 @@ export function Settings() {
     setLoading(true);
     setAlert(null);
     try {
-      const response = await fetch('/github/repositories');
+      const response = await apiFetch('/github/repositories');
       if (response.ok) {
         const data = await response.json();
         setGitRepos(data);
@@ -69,7 +70,7 @@ export function Settings() {
         .filter(r => r.selected)
         .map(r => r.githubRepoId);
 
-      const response = await fetch('/repositories/select', {
+      const response = await apiFetch('/repositories/select', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ githubRepositoryIds: selectedIds })

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Calendar, GitCommit, Sparkles, Layers } from 'lucide-react';
 import { Skeleton } from '../components/Skeleton';
+import { apiFetch } from '../utils/apiUtils';
 
 export function TimelinePage({ selectedRepoId }) {
   const [timelines, setTimelines] = useState([]);
@@ -11,7 +12,7 @@ export function TimelinePage({ selectedRepoId }) {
     setLoading(true);
     try {
       const repoId = selectedRepoId || 1;
-      const res = await fetch(`/api/memory/${repoId}/timeline`);
+      const res = await apiFetch(`/api/memory/${repoId}/timeline`);
       if (res.ok) {
         const data = await res.json();
         setTimelines(data);

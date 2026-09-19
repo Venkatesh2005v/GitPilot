@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
 import { Search, Maximize2, RotateCcw, Download, X } from 'lucide-react';
+import { apiFetch } from '../utils/apiUtils';
 
 cytoscape.use(dagre);
 
@@ -22,7 +23,7 @@ export function ArchitectureGraph({ repositoryId }) {
     setLoading(true);
     setSelectedNode(null);
     const controller = new AbortController();
-    fetch(`/architecture/repositories/${repositoryId}/callgraph`, { signal: controller.signal })
+    apiFetch(`/architecture/repositories/${repositoryId}/callgraph`, { signal: controller.signal })
       .then(r => r.ok ? r.json() : null)
       .then(d => setGraphData(d))
       .catch(e => { if (e.name !== 'AbortError') setGraphData(null); })

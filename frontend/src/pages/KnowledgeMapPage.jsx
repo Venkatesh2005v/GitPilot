@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { KnowledgeGraph } from '../components/KnowledgeGraph';
 import { Cpu, Layers, Sparkles } from 'lucide-react';
 import { Skeleton } from '../components/Skeleton';
+import { apiFetch } from '../utils/apiUtils';
 
 export function KnowledgeMapPage({ selectedRepoId }) {
   const [mapData, setMapData] = useState(null);
@@ -12,7 +13,7 @@ export function KnowledgeMapPage({ selectedRepoId }) {
     setLoading(true);
     try {
       const repoId = selectedRepoId || 1;
-      const res = await fetch(`/api/memory/${repoId}/knowledge-map`);
+      const res = await apiFetch(`/api/memory/${repoId}/knowledge-map`);
       if (res.ok) {
         const data = await res.json();
         setMapData(data);

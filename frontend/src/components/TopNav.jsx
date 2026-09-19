@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { GitBranch, Settings } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import { apiFetch } from '../utils/apiUtils';
 
 export function TopNav({ user, selectedRepoId, setSelectedRepoId }) {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ export function TopNav({ user, selectedRepoId, setSelectedRepoId }) {
 
   const fetchTrackedRepos = async () => {
     try {
-      const response = await fetch('/dashboard/repositories');
+      const response = await apiFetch('/dashboard/repositories');
       if (response.ok) {
         const data = await response.json();
         setRepos(data);

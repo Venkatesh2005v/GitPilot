@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { GitBranch, Lock, Database, Box, Zap, Sparkles, Filter, Calendar, User, Tag } from 'lucide-react';
 import { Skeleton } from '../components/Skeleton';
+import { apiFetch } from '../utils/apiUtils';
 
 export function JourneyPage({ selectedRepoId }) {
   const [journeys, setJourneys] = useState([]);
@@ -23,7 +24,7 @@ export function JourneyPage({ selectedRepoId }) {
       if (release) url += `release=${release}&`;
       if (contributor) url += `contributor=${contributor}&`;
 
-      const res = await fetch(url);
+      const res = await apiFetch(url);
       if (res.ok) {
         const data = await res.json();
         setJourneys(data);

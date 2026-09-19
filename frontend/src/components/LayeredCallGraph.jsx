@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ReactFlow, { Background, Controls, useNodesState, useEdgesState, MarkerType } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { apiFetch } from '../utils/apiUtils';
 
 const NODE_COLORS = {
   CONTROLLER: '#8b5cf6',
@@ -41,7 +42,7 @@ export function LayeredCallGraph({ repositoryId }) {
   useEffect(() => {
     if (!repositoryId) return;
     setLoading(true);
-    fetch(`/architecture/repositories/${repositoryId}/callgraph`)
+    apiFetch(`/architecture/repositories/${repositoryId}/callgraph`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         setGraphData(data);

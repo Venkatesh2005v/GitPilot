@@ -22,6 +22,7 @@ import { VerticalTimeline } from '../components/VerticalTimeline';
 import { RecommendationCard } from '../components/RecommendationCard';
 import { TechPill } from '../components/TechPill';
 import { Skeleton } from '../components/Skeleton';
+import { apiFetch } from '../utils/apiUtils';
 
 export function Dashboard({ setSelectedRepoId }) {
   const navigate = useNavigate();
@@ -43,8 +44,8 @@ export function Dashboard({ setSelectedRepoId }) {
       setLoading(true);
       try {
         const [summaryRes, reposRes] = await Promise.all([
-          fetch('/dashboard/summary', { signal }),
-          fetch('/dashboard/repositories', { signal })
+          apiFetch('/dashboard/summary', { signal }),
+          apiFetch('/dashboard/repositories', { signal })
         ]);
 
         if (!isSubscribed) return;
@@ -70,7 +71,7 @@ export function Dashboard({ setSelectedRepoId }) {
           
           const commitPromises = selectedRepos.map(async (repo) => {
             try {
-              const res = await fetch(`/repositories/${repo.id}/commits?page=0&size=10`, { signal });
+              const res = await apiFetch(`/repositories/${repo.id}/commits?page=0&size=10`, { signal });
               if (res.ok) {
                 const data = await res.json();
                 return data.map(c => ({ ...c, repoName: repo.repositoryName, repoId: repo.id }));
@@ -81,7 +82,7 @@ export function Dashboard({ setSelectedRepoId }) {
 
           const contributorPromises = selectedRepos.map(async (repo) => {
             try {
-              const res = await fetch(`/repositories/${repo.id}/contributors`, { signal });
+              const res = await apiFetch(`/repositories/${repo.id}/contributors`, { signal });
               if (res.ok) {
                 const data = await res.json();
                 return data;

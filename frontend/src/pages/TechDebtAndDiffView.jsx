@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Gauge, GitCompare, Award, Activity, FileCode, CheckCircle, TrendingUp, Cpu } from 'lucide-react';
+import { apiFetch } from '../utils/apiUtils';
 
 export function TechDebtAndDiffView({ selectedRepoId }) {
   const repoId = selectedRepoId || 1;
@@ -11,9 +12,9 @@ export function TechDebtAndDiffView({ selectedRepoId }) {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch(`/api/architecture/tech-debt/${repoId}`).then(r => r.ok ? r.json() : null),
-      fetch(`/api/architecture/releases/${repoId}`).then(r => r.ok ? r.json() : null),
-      fetch(`/api/architecture/diff/${repoId}`).then(r => r.ok ? r.json() : null),
+      apiFetch(`/api/architecture/tech-debt/${repoId}`).then(r => r.ok ? r.json() : null),
+      apiFetch(`/api/architecture/releases/${repoId}`).then(r => r.ok ? r.json() : null),
+      apiFetch(`/api/architecture/diff/${repoId}`).then(r => r.ok ? r.json() : null),
     ]).then(([debt, rel, diff]) => {
       setTechDebtData(debt);
       setReleaseData(rel);

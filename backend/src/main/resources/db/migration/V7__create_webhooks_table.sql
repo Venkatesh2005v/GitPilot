@@ -11,4 +11,4 @@ CREATE TABLE IF NOT EXISTS repository_webhook (
     UNIQUE(repository_id)
 );
 
-CREATE INDEX idx_repo_webhook_repo_id ON repository_webhook(repository_id);
+CREATE INDEX IF NOT EXISTS idx_repo_webhook_repo_id ON repository_webhook(repository_id);

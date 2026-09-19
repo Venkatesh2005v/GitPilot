@@ -13,6 +13,7 @@ import { OnboardingPage } from './pages/OnboardingPage';
 import { RecommendationsPage } from './pages/RecommendationsPage';
 import { ArchitectureExplorer } from './pages/ArchitectureExplorer';
 import { TeamIntelligenceView } from './pages/TeamIntelligenceView';
+import { apiFetch } from './utils/apiUtils';
 
 function AppContent() {
   const [user, setUser] = useState(null);
@@ -21,7 +22,7 @@ function AppContent() {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/me');
+      const response = await apiFetch('/me');
       if (response.ok) {
         const data = await response.json();
         setUser(data);

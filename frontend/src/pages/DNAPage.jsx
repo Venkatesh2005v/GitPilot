@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { CircularProgress } from '../components/CircularProgress';
 import { Cpu, ShieldCheck, Activity, Layers, Sparkles, CheckCircle2, Zap } from 'lucide-react';
 import { Skeleton } from '../components/Skeleton';
+import { apiFetch } from '../utils/apiUtils';
 
 export function DNAPage({ selectedRepoId }) {
   const [dna, setDna] = useState(null);
@@ -12,7 +13,7 @@ export function DNAPage({ selectedRepoId }) {
     setLoading(true);
     try {
       const repoId = selectedRepoId || 1;
-      const res = await fetch(`/api/memory/${repoId}/dna`);
+      const res = await apiFetch(`/api/memory/${repoId}/dna`);
       if (res.ok) {
         const data = await res.json();
         setDna(data);

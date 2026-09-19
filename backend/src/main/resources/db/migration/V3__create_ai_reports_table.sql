@@ -1,4 +1,4 @@
-CREATE TABLE ai_reports (
+CREATE TABLE IF NOT EXISTS ai_reports (
     id BIGSERIAL PRIMARY KEY,
     repository_id BIGINT NOT NULL,
     report_type VARCHAR(255) NOT NULL,

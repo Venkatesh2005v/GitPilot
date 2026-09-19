@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldAlert, AlertTriangle, Radio, Compass, ArrowRight, Zap, CheckCircle2, Info } from 'lucide-react';
+import { apiFetch } from '../utils/apiUtils';
 
 export function ImpactAndDriftView({ selectedRepoId }) {
   const repoId = selectedRepoId || 1;
@@ -11,7 +12,7 @@ export function ImpactAndDriftView({ selectedRepoId }) {
 
   const fetchDrift = async () => {
     try {
-      const res = await fetch(`/api/architecture/drift/${repoId}`);
+      const res = await apiFetch(`/api/architecture/drift/${repoId}`);
       if (res.ok) {
         const data = await res.json();
         setDriftData(data);
@@ -25,7 +26,7 @@ export function ImpactAndDriftView({ selectedRepoId }) {
     setAnalyzingImpact(true);
     try {
       const files = modifiedInput.split(',').map(f => f.trim()).filter(Boolean);
-      const res = await fetch(`/api/architecture/impact/${repoId}`, {
+      const res = await apiFetch(`/api/architecture/impact/${repoId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(files)

@@ -1,7 +1,8 @@
 -- Cleanup: Remove demo/mock commits from repositories 3 and 4.
 -- These were inserted by a previous synchronization fallback that used placeholder author names.
+-- Uses correct table names (commits, contextual_recommendations) and is safe if rows are absent.
 
-DELETE FROM commit
+DELETE FROM commits
 WHERE repository_id IN (3, 4)
   AND (
     author_name IN ('Alice Developer', 'Bob Architect', 'Charlie QA')
@@ -9,5 +10,5 @@ WHERE repository_id IN (3, 4)
   );
 
 -- Also remove any seeded recommendations for these repos so fresh ones regenerate
-DELETE FROM recommendation
+DELETE FROM contextual_recommendations
 WHERE repository_id IN (3, 4);

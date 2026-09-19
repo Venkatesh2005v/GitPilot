@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Users, AlertCircle, ShieldAlert, Award, ArrowUpRight, CheckCircle2, UserCheck } from 'lucide-react';
 import { TopLoadingBar, RepositoryLoader } from '../components/RepositoryLoader';
+import { apiFetch } from '../utils/apiUtils';
 
 export function TeamIntelligenceView({ selectedRepoId }) {
   const [data, setData] = useState(null);
@@ -18,7 +19,7 @@ export function TeamIntelligenceView({ selectedRepoId }) {
     setData(null);
     setLoading(true);
     setError(null);
-    fetch(`/api/team/bus-factor/${selectedRepoId}`, { signal: controller.signal })
+    apiFetch(`/api/team/bus-factor/${selectedRepoId}`, { signal: controller.signal })
       .then(res => {
         if (!res.ok) throw new Error(`Failed to load (${res.status})`);
         return res.json();

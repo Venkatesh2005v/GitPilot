@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieCha
 import { BarChart2, TrendingUp, AlertTriangle, Users, GitCommit, Layers, Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Skeleton } from '../components/Skeleton';
+import { apiFetch } from '../utils/apiUtils';
 
 export function Analytics() {
   const [repos, setRepos] = useState([]);
@@ -11,7 +12,7 @@ export function Analytics() {
 
   const fetchAnalytics = async () => {
     try {
-      const response = await fetch('/dashboard/repositories');
+      const response = await apiFetch('/dashboard/repositories');
       if (response.ok) {
         const data = await response.json();
         setRepos(data);
