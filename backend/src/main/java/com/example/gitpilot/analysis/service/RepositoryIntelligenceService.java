@@ -39,6 +39,7 @@ public class RepositoryIntelligenceService {
     private final ImprovementSuggestionsService improvementSuggestionsService;
     private final AIGatewayService aiGatewayService;
     private final com.example.gitpilot.github.client.GithubClient githubClient;
+    private final RepositoryEvidenceService repositoryEvidenceService;
     private final ObjectMapper objectMapper;
 
     public RepositoryIntelligenceService(RepositoryRepository repositoryRepository,
@@ -51,7 +52,8 @@ public class RepositoryIntelligenceService {
                                          HealthScoreService healthScoreService,
                                          ImprovementSuggestionsService improvementSuggestionsService,
                                          AIGatewayService aiGatewayService,
-                                         com.example.gitpilot.github.client.GithubClient githubClient) {
+                                         com.example.gitpilot.github.client.GithubClient githubClient,
+                                         RepositoryEvidenceService repositoryEvidenceService) {
         this.repositoryRepository = repositoryRepository;
         this.commitRepository = commitRepository;
         this.aiReportRepository = aiReportRepository;
@@ -63,6 +65,7 @@ public class RepositoryIntelligenceService {
         this.improvementSuggestionsService = improvementSuggestionsService;
         this.aiGatewayService = aiGatewayService;
         this.githubClient = githubClient;
+        this.repositoryEvidenceService = repositoryEvidenceService;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
         this.objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -134,11 +137,15 @@ public class RepositoryIntelligenceService {
 
         try {
             techStack = technologyDetectionService.detectTechStack(repository, accessToken, readmeContent, commitMsgs);
+            // Detect concrete repository evidence (tests/CI/Docker) once, reused by health scoring
+            // and the deterministic recommendation fallback. Fails safe (unresolved) if unavailable.
+            RepositoryEvidenceService.RepositoryEvidence evidence =
+                    repositoryEvidenceService.detect(owner, repoShort, accessToken, techStack.getDetectedManifestFiles());
             summary = repositoryAnalysisService.analyzeRepository(repository, techStack, commitMsgs, readmeContent);
             readmeSummary = readmeAnalysisService.analyzeReadme(repository, readmeContent);
             commitSummary = commitAnalysisService.analyzeCommits(repository, commits);
-            healthScore = healthScoreService.calculateHealthScore(repository, techStack, readmeContent, commits);
-            suggestions = improvementSuggestionsService.generateSuggestions(repository, techStack, healthScore, readmeContent);
+            healthScore = healthScoreService.calculateHealthScore(repository, techStack, readmeContent, commits, evidence);
+            suggestions = improvementSuggestionsService.generateSuggestions(repository, techStack, healthScore, readmeContent, evidence);
         } catch (Exception e) {
             // Graceful fallback: return minimal data indicating AI analysis is unavailable
             techStack = TechStackDto.builder()

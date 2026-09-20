@@ -4,6 +4,7 @@ import com.example.gitpilot.ai.gateway.AIGatewayService;
 import com.example.gitpilot.analysis.dto.HealthScoreDto;
 import com.example.gitpilot.analysis.dto.ImprovementSuggestionDto;
 import com.example.gitpilot.analysis.dto.TechStackDto;
+import com.example.gitpilot.analysis.service.RepositoryEvidenceService.RepositoryEvidence;
 import com.example.gitpilot.repository.entity.Repository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +23,15 @@ public class ImprovementSuggestionsService {
         this.aiGatewayService = aiGatewayService;
     }
 
+    /**
+     * Backward-compatible overload. Without concrete evidence, the deterministic fallback
+     * cannot verify whether tests/CI already exist, so it is treated as unresolved.
+     */
     public List<ImprovementSuggestionDto> generateSuggestions(Repository repository, TechStackDto techStack, HealthScoreDto healthScore, String readmeContent) {
+        return generateSuggestions(repository, techStack, healthScore, readmeContent, RepositoryEvidence.unresolved());
+    }
+
+    public List<ImprovementSuggestionDto> generateSuggestions(Repository repository, TechStackDto techStack, HealthScoreDto healthScore, String readmeContent, RepositoryEvidence evidence) {
         String readmeSnippet = (readmeContent != null && readmeContent.length() > 500) ? readmeContent.substring(0, 500) : (readmeContent != null ? readmeContent : "");
         String prompt = String.format(
                 "You are a Software Engineering Advisor analyzing repository '%s'.\n" +
@@ -55,61 +64,111 @@ public class ImprovementSuggestionsService {
             String rawJson = cleanJsonResponse(result.text);
             return objectMapper.readValue(rawJson, new TypeReference<List<ImprovementSuggestionDto>>() {});
         } catch (Exception e) {
-            List<ImprovementSuggestionDto> defaultSuggestions = new ArrayList<>();
+            return buildEvidenceBasedFallback(techStack, healthScore, readmeContent, evidence);
+        }
+    }
 
-            defaultSuggestions.add(ImprovementSuggestionDto.builder()
-                    .title("Add Unit Testing")
+    /**
+     * Deterministic, evidence-based fallback used when the AI gateway is unavailable.
+     * It only surfaces GENUINE gaps derived from concrete repository evidence:
+     *  - Recommends testing only if tests are NOT already present.
+     *  - Recommends CI/CD only if no CI configuration is present.
+     *  - Recommends Docker only if no Docker artifacts are present.
+     *  - Recommends README/license improvements only when those are missing.
+     * When evidence is unresolved (GitHub unavailable / no token), it does not assume a gap
+     * for test/CI/Docker (avoids false "Add X" advice); it returns fewer, safe suggestions.
+     * No randomization; identical inputs always yield identical output.
+     */
+    private List<ImprovementSuggestionDto> buildEvidenceBasedFallback(TechStackDto techStack,
+                                                                      HealthScoreDto healthScore,
+                                                                      String readmeContent,
+                                                                      RepositoryEvidence evidence) {
+        List<ImprovementSuggestionDto> suggestions = new ArrayList<>();
+        List<String> manifests = techStack.getDetectedManifestFiles() != null ? techStack.getDetectedManifestFiles() : List.of();
+        String manifestLower = String.join(" ", manifests).toLowerCase();
+
+        boolean resolved = evidence != null && evidence.isResolved();
+        boolean hasTests = evidence != null && evidence.isHasTests();
+        boolean hasCI = evidence != null && evidence.isHasCI();
+        boolean hasDocker = (evidence != null && evidence.isHasDocker())
+                || manifestLower.contains("dockerfile") || manifestLower.contains("docker-compose");
+
+        // Testing: only recommend if we CONFIRMED there are no tests.
+        if (resolved && !hasTests) {
+            String lang = techStack.getPrimaryLanguage() != null ? techStack.getPrimaryLanguage() : "";
+            String testTooling = switch (lang) {
+                case "Java", "Kotlin" -> "JUnit 5 and Mockito";
+                case "JavaScript", "TypeScript" -> "Jest or Vitest";
+                case "Python" -> "pytest";
+                case "Go" -> "the built-in testing package";
+                case "Rust" -> "the built-in test harness";
+                default -> "your stack's standard test framework";
+            };
+            suggestions.add(ImprovementSuggestionDto.builder()
+                    .title("Add automated tests")
                     .category("Testing")
                     .priority("HIGH")
-                    .description("Implement comprehensive unit tests with JUnit 5 and Mockito for domain services.")
+                    .description("No test directory or test files were detected. Introduce automated tests using "
+                            + testTooling + " to guard against regressions.")
                     .build());
+        }
 
-            defaultSuggestions.add(ImprovementSuggestionDto.builder()
-                    .title("Add Integration Testing")
-                    .category("Testing")
-                    .priority("MEDIUM")
-                    .description("Configure Testcontainers or mock web environments for automated API integration testing.")
-                    .build());
-
-            if (!techStack.getDetectedManifestFiles().contains("Dockerfile") && !techStack.getDetectedManifestFiles().contains("docker-compose.yml")) {
-                defaultSuggestions.add(ImprovementSuggestionDto.builder()
-                        .title("Add Docker Compose")
-                        .category("DevOps")
-                        .priority("HIGH")
-                        .description("Provide a `docker-compose.yml` to spin up PostgreSQL and application dependencies effortlessly.")
-                        .build());
-            }
-
-            defaultSuggestions.add(ImprovementSuggestionDto.builder()
-                    .title("Configure CI/CD")
+        // CI/CD: only recommend if we CONFIRMED there is no CI configuration.
+        if (resolved && !hasCI) {
+            suggestions.add(ImprovementSuggestionDto.builder()
+                    .title("Set up a CI pipeline")
                     .category("DevOps")
                     .priority("HIGH")
-                    .description("Add a `.github/workflows/ci.yml` pipeline for continuous integration and automated build verification.")
+                    .description("No CI configuration (e.g. .github/workflows) was detected. Add a pipeline that builds and runs checks on every push.")
                     .build());
-
-            defaultSuggestions.add(ImprovementSuggestionDto.builder()
-                    .title("Improve Logging")
-                    .category("Quality")
-                    .priority("MEDIUM")
-                    .description("Introduce structured SLF4J/MDC contextual logging for enhanced production observability.")
-                    .build());
-
-            defaultSuggestions.add(ImprovementSuggestionDto.builder()
-                    .title("Add Caching")
-                    .category("Performance")
-                    .priority("MEDIUM")
-                    .description("Implement Spring Cache or Redis caching for frequent repository read queries.")
-                    .build());
-
-            defaultSuggestions.add(ImprovementSuggestionDto.builder()
-                    .title("Improve Exception Handling")
-                    .category("Architecture")
-                    .priority("LOW")
-                    .description("Ensure all API exceptions yield standard RFC 7807 Problem Details response formats.")
-                    .build());
-
-            return defaultSuggestions;
         }
+
+        // Docker: only recommend if we CONFIRMED there are no Docker artifacts.
+        if (resolved && !hasDocker) {
+            suggestions.add(ImprovementSuggestionDto.builder()
+                    .title("Add containerization")
+                    .category("DevOps")
+                    .priority("MEDIUM")
+                    .description("No Dockerfile or docker-compose file was detected. Containerizing the app makes local setup and deployment reproducible.")
+                    .build());
+        }
+
+        // Documentation: driven by health-score evidence (README presence is measured there).
+        boolean hasReadme = readmeContent != null && readmeContent.trim().length() > 50;
+        boolean noReadmeWeakness = healthScore != null && healthScore.getKeyWeaknesses() != null
+                && healthScore.getKeyWeaknesses().stream().anyMatch(w -> w.toLowerCase().contains("readme"));
+        if (!hasReadme || noReadmeWeakness) {
+            suggestions.add(ImprovementSuggestionDto.builder()
+                    .title("Improve project documentation")
+                    .category("Documentation")
+                    .priority("MEDIUM")
+                    .description("Add or expand the README with setup, usage, and architecture notes to speed up contributor onboarding.")
+                    .build());
+        }
+
+        boolean noLicenseWeakness = healthScore != null && healthScore.getKeyWeaknesses() != null
+                && healthScore.getKeyWeaknesses().stream().anyMatch(w -> w.toLowerCase().contains("license"));
+        if (noLicenseWeakness) {
+            suggestions.add(ImprovementSuggestionDto.builder()
+                    .title("Add a license file")
+                    .category("Documentation")
+                    .priority("LOW")
+                    .description("No license file was detected. Adding one clarifies how others may use and contribute to the project.")
+                    .build());
+        }
+
+        // If evidence could not be resolved and nothing else surfaced, provide a single honest,
+        // non-generic note rather than fabricating gaps.
+        if (suggestions.isEmpty()) {
+            suggestions.add(ImprovementSuggestionDto.builder()
+                    .title("Re-run AI analysis for tailored recommendations")
+                    .category("Analysis")
+                    .priority("LOW")
+                    .description("Detailed recommendations are generated by the AI analyzer. It was unavailable and repository evidence was insufficient to identify concrete gaps. Use the refresh button to retry.")
+                    .build());
+        }
+
+        return suggestions;
     }
 
     private String cleanJsonResponse(String raw) {

@@ -3,6 +3,7 @@ package com.example.gitpilot.analysis.service;
 import com.example.gitpilot.ai.gateway.AIGatewayService;
 import com.example.gitpilot.analysis.dto.HealthScoreDto;
 import com.example.gitpilot.analysis.dto.TechStackDto;
+import com.example.gitpilot.analysis.service.RepositoryEvidenceService.RepositoryEvidence;
 import com.example.gitpilot.commit.entity.Commit;
 import com.example.gitpilot.repository.entity.Repository;
 import lombok.extern.slf4j.Slf4j;
@@ -23,18 +24,32 @@ public class HealthScoreService {
         this.aiGatewayService = aiGatewayService;
     }
 
+    /** Backward-compatible overload: no concrete file evidence available. */
     public HealthScoreDto calculateHealthScore(Repository repository, TechStackDto techStack, String readmeContent, List<Commit> commits) {
+        return calculateHealthScore(repository, techStack, readmeContent, commits, RepositoryEvidence.unresolved());
+    }
+
+    public HealthScoreDto calculateHealthScore(Repository repository, TechStackDto techStack, String readmeContent, List<Commit> commits, RepositoryEvidence evidence) {
         List<String> manifests = techStack.getDetectedManifestFiles() != null ? techStack.getDetectedManifestFiles() : List.of();
         List<String> techs = techStack.getDetectedTechnologies() != null ? techStack.getDetectedTechnologies() : List.of();
         String techLower = String.join(" ", techs).toLowerCase();
         String manifestLower = String.join(" ", manifests).toLowerCase();
 
+        boolean evidenceResolved = evidence != null && evidence.isResolved();
+
         boolean hasReadme = readmeContent != null && readmeContent.trim().length() > 50;
         boolean hasLicense = manifests.stream().anyMatch(f -> f.toLowerCase().contains("license"));
-        boolean hasDocker = manifestLower.contains("dockerfile") || techLower.contains("docker");
-        boolean hasCI = manifestLower.contains(".github") || manifestLower.contains("jenkinsfile") || manifestLower.contains(".gitlab-ci");
-        boolean hasTests = techLower.contains("junit") || techLower.contains("jest") || techLower.contains("pytest")
-                || (readmeContent != null && readmeContent.toLowerCase().contains("test"));
+
+        // Prefer concrete file-path evidence when resolved; otherwise fall back to the prior heuristic.
+        boolean hasDocker = (evidenceResolved && evidence.isHasDocker())
+                || manifestLower.contains("dockerfile") || techLower.contains("docker");
+        boolean hasCI = evidenceResolved
+                ? evidence.isHasCI()
+                : (manifestLower.contains(".github") || manifestLower.contains("jenkinsfile") || manifestLower.contains(".gitlab-ci"));
+        boolean hasTests = evidenceResolved
+                ? evidence.isHasTests()
+                : (techLower.contains("junit") || techLower.contains("jest") || techLower.contains("pytest")
+                        || (readmeContent != null && readmeContent.toLowerCase().contains("test")));
         boolean hasConfigQuality = manifests.size() >= 3;
         boolean hasProperStructure = manifests.size() >= 2;
 
