@@ -161,6 +161,58 @@ export function OnboardingPage({ selectedRepoId }) {
               )}
             </motion.div>
 
+            {/* Project Foundation: Problem Solved & Primary Requirements */}
+            {(report.problemSolved || (report.primaryRequirements && report.primaryRequirements.length > 0)) && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1.75rem', marginBottom: '2rem' }}>
+                {report.problemSolved && (
+                  <motion.div variants={cardVariants} className="card-3xl" style={{ padding: '1.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+                      <Sparkles size={20} style={{ color: 'var(--accent-primary)' }} />
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'Space Grotesk' }}>Problem Solved</h3>
+                    </div>
+                    <p style={{ fontSize: '0.95rem', color: 'var(--text-primary)', lineHeight: 1.7, margin: 0 }}>
+                      {report.problemSolved}
+                    </p>
+                  </motion.div>
+                )}
+
+                {report.primaryRequirements && report.primaryRequirements.length > 0 && (
+                  <motion.div variants={cardVariants} className="card-3xl" style={{ padding: '1.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+                      <CheckCircle2 size={20} style={{ color: 'var(--accent-teal)' }} />
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'Space Grotesk' }}>Primary Requirements</h3>
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.8 }}>
+                      {report.primaryRequirements.map((req, idx) => <li key={idx}>{req}</li>)}
+                    </ul>
+                  </motion.div>
+                )}
+              </div>
+            )}
+
+            {/* Implemented Capabilities (evidence-backed) */}
+            {report.implementedFeatures && report.implementedFeatures.length > 0 && (
+              <motion.div variants={cardVariants} className="card-3xl" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem' }}>
+                  <CheckCircle2 size={20} style={{ color: '#10b981' }} />
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'Space Grotesk' }}>Implemented Capabilities</h3>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+                  {report.implementedFeatures.map((feat, idx) => (
+                    <div key={idx} style={{ padding: '1.25rem', borderRadius: '1.25rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>{feat.name}</div>
+                      {feat.description && (
+                        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{feat.description}</p>
+                      )}
+                      {feat.evidence && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--accent-teal)', fontFamily: 'JetBrains Mono' }}>Evidence: {feat.evidence}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
             {/* Grid: Tech Stack & Learning Path */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1.75rem', marginBottom: '2rem' }}>
               {/* Tech Stack */}
@@ -197,16 +249,16 @@ export function OnboardingPage({ selectedRepoId }) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                   {(() => {
-                    const steps = report.recommendedLearningPath?.length > 0
-                      ? report.recommendedLearningPath
-                      : (report.suggestions || []).map(s => `[${s.priority}] ${s.title} — ${s.description}`);
+                    // Use the backend-provided (AI or deterministic) learning path only.
+                    // No frontend-invented fallback content.
+                    const steps = Array.isArray(report.recommendedLearningPath) ? report.recommendedLearningPath : [];
                     return steps.length > 0 ? steps.map((step, idx) => (
                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.85rem', borderRadius: '0.85rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
                       <ArrowRight size={16} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
                       <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{typeof step === 'string' ? step : step.title}</span>
                     </div>
                   )) : (
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Learning path will appear after AI analysis.</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Not enough repository evidence yet to generate a learning path.</span>
                   );
                   })()}
                 </div>

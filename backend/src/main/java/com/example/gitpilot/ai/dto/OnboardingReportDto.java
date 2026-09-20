@@ -33,6 +33,16 @@ public class OnboardingReportDto {
     private LocalDateTime generatedAt;
     private boolean isCached;
 
+    // ---- Phase 3: Project Foundation (additive; optional; backward compatible) ----
+    /** What problem the project solves, derived from evidence. May state that evidence is insufficient. */
+    private String problemSolved;
+    /** Major capabilities/requirements supported by repository evidence. */
+    @Builder.Default
+    private List<String> primaryRequirements = new ArrayList<>();
+    /** Features considered IMPLEMENTED because they are backed by concrete code/structure/config evidence. */
+    @Builder.Default
+    private List<ImplementedFeatureDto> implementedFeatures = new ArrayList<>();
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -41,5 +51,16 @@ public class OnboardingReportDto {
         private String moduleName;
         private String responsibility;
         private List<String> keyFiles;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ImplementedFeatureDto {
+        private String name;
+        private String description;
+        /** Why this is considered implemented (e.g. "controller class present", "dependency detected"). */
+        private String evidence;
     }
 }
