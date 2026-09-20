@@ -1,7 +1,7 @@
 import React from 'react';
 import { GitCommit, GitPullRequest, Zap, CheckCircle2, Clock } from 'lucide-react';
 
-export function VerticalTimeline({ items = [] }) {
+export function VerticalTimeline({ items = [], onSelect = null, selectedSha = null }) {
   if (!items || items.length === 0) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -32,13 +32,34 @@ export function VerticalTimeline({ items = [] }) {
         background: 'var(--border-color)'
       }} />
 
-      {items.map((item, idx) => (
-        <div key={idx} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+      {items.map((item, idx) => {
+        const clickable = typeof onSelect === 'function' && !!item.sha;
+        const isSelected = selectedSha && item.sha === selectedSha;
+        return (
+        <div
+          key={idx}
+          onClick={clickable ? () => onSelect(item.sha) : undefined}
+          role={clickable ? 'button' : undefined}
+          tabIndex={clickable ? 0 : undefined}
+          onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(item.sha); } } : undefined}
+          style={{
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.35rem',
+            cursor: clickable ? 'pointer' : 'default',
+            padding: clickable ? '0.5rem 0.75rem' : 0,
+            borderRadius: clickable ? '0.75rem' : 0,
+            background: isSelected ? 'var(--bg-secondary)' : 'transparent',
+            border: isSelected ? '1px solid var(--accent-primary)' : (clickable ? '1px solid transparent' : 'none'),
+            transition: 'background 0.15s ease, border-color 0.15s ease'
+          }}
+        >
           {/* Timeline Dot Node */}
           <div style={{
             position: 'absolute',
-            left: '-1.5rem',
-            top: '4px',
+            left: clickable ? '-2rem' : '-1.5rem',
+            top: clickable ? '0.85rem' : '4px',
             width: '16px',
             height: '16px',
             borderRadius: '50%',
@@ -66,7 +87,8 @@ export function VerticalTimeline({ items = [] }) {
             {item.message}
           </p>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

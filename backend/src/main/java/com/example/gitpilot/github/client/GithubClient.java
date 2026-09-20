@@ -1,5 +1,6 @@
 package com.example.gitpilot.github.client;
 
+import com.example.gitpilot.github.dto.GithubCommitDetailResponse;
 import com.example.gitpilot.github.dto.GithubCommitResponse;
 import com.example.gitpilot.github.dto.GithubRepositoryResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,26 @@ public class GithubClient {
 
     public List<GithubCommitResponse> getPublicCommits(String owner, String repo) {
         return getCommits(owner, repo, null);
+    }
+
+    /**
+     * Fetch a single commit's detail (stats + changed files + patches) from GitHub.
+     * GET /repos/{owner}/{repo}/commits/{sha}. Uses the same RestClient/auth pattern as the
+     * other methods. Throws RestClientResponseException on HTTP errors (404/403/5xx) so the
+     * caller can translate them into the appropriate application response.
+     */
+    public GithubCommitDetailResponse getCommitDetail(String owner, String repo, String sha, String accessToken) {
+        log.info("[GitHubAPI] GET /repos/{}/{}/commits/{}", owner, repo, sha);
+        var spec = restClient.get()
+                .uri("https://api.github.com/repos/{owner}/{repo}/commits/{sha}", owner, repo, sha)
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "GitPilot-Application");
+
+        if (accessToken != null && !accessToken.isBlank()) {
+            spec = spec.header("Authorization", "Bearer " + accessToken);
+        }
+
+        return spec.retrieve().body(GithubCommitDetailResponse.class);
     }
 
     public java.util.Map<String, Long> getLanguages(String owner, String repo, String accessToken) {

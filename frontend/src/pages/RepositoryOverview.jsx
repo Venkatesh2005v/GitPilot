@@ -30,12 +30,13 @@ import { CircularProgress } from '../components/CircularProgress';
 import { TechPill } from '../components/TechPill';
 import { RecommendationCard } from '../components/RecommendationCard';
 import { VerticalTimeline } from '../components/VerticalTimeline';
+import { CommitDetailPanel } from '../components/CommitDetailPanel';
 import { Skeleton } from '../components/Skeleton';
 import { TopLoadingBar, RepositoryLoader } from '../components/RepositoryLoader';
 import { OnboardingPage } from './OnboardingPage';
 import { ArchitectureExplorer } from './ArchitectureExplorer';
 import { TeamIntelligenceView } from './TeamIntelligenceView';
-import { safeFetchJson, getNumericHealthScore, getSummaryText, getTechStackArray } from '../utils/apiUtils';
+import { safeFetchJson, apiFetch, getNumericHealthScore, getSummaryText, getTechStackArray } from '../utils/apiUtils';
 
 export function RepositoryOverview({ setSelectedRepoId }) {
   const { id } = useParams();
@@ -52,6 +53,36 @@ export function RepositoryOverview({ setSelectedRepoId }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
 
+  // Commit detail (Phase 4) — fetched on demand only when a commit is selected.
+  const [selectedCommitSha, setSelectedCommitSha] = useState(null);
+  const [commitDetail, setCommitDetail] = useState(null);
+  const [commitDetailLoading, setCommitDetailLoading] = useState(false);
+  const [commitDetailError, setCommitDetailError] = useState(null);
+
+  const fetchCommitDetail = async (sha) => {
+    if (!sha) return;
+    setSelectedCommitSha(sha);
+    setCommitDetail(null);
+    setCommitDetailError(null);
+    setCommitDetailLoading(true);
+    try {
+      const res = await apiFetch(`/repositories/${id}/commits/${sha}`);
+      if (res.ok) {
+        setCommitDetail(await res.json());
+      } else if (res.status === 429) {
+        setCommitDetailError('GitHub rate limit reached. Please try again shortly.');
+      } else if (res.status === 404) {
+        setCommitDetailError('Commit details are no longer available.');
+      } else {
+        setCommitDetailError('Unable to load commit details.');
+      }
+    } catch (e) {
+      setCommitDetailError('Network error loading commit details.');
+    } finally {
+      setCommitDetailLoading(false);
+    }
+  };
+
   useEffect(() => {
     let isSubscribed = true;
     const controller = new AbortController();
@@ -66,6 +97,9 @@ export function RepositoryOverview({ setSelectedRepoId }) {
     setCommits([]);
     setContributors([]);
     setIntelligence(null);
+    setSelectedCommitSha(null);
+    setCommitDetail(null);
+    setCommitDetailError(null);
 
     // Pre-fetch onboarding guide in background & check welcome banner state
     const viewedKey = `gitpilot_viewed_onboarding_${id}`;
@@ -491,11 +525,26 @@ export function RepositoryOverview({ setSelectedRepoId }) {
             </div>
 
             {commits.length > 0 ? (
-              <VerticalTimeline items={commits} />
+              <>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                  Select a commit to view changed files and diffs.
+                </p>
+                <VerticalTimeline items={commits} onSelect={fetchCommitDetail} selectedSha={selectedCommitSha} />
+              </>
             ) : (
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>
                 No commits available. Sync the repository to load commit history.
               </p>
+            )}
+
+            {selectedCommitSha && (
+              <CommitDetailPanel
+                loading={commitDetailLoading}
+                error={commitDetailError}
+                detail={commitDetail}
+                onClose={() => { setSelectedCommitSha(null); setCommitDetail(null); setCommitDetailError(null); }}
+                onRetry={() => fetchCommitDetail(selectedCommitSha)}
+              />
             )}
           </motion.div>
 
