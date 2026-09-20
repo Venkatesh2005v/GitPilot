@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 public class TechnologyDetectionService {
 
     private final GithubClient githubClient;
+    private final RepositoryFingerprintService fingerprintService;
 
     // Manifest file → [language, build tool/framework]
     private static final Map<String, String[]> MANIFEST_MAP = Map.ofEntries(
@@ -59,8 +60,9 @@ public class TechnologyDetectionService {
             "actix", "rocket", "gin", "fiber"
     );
 
-    public TechnologyDetectionService(GithubClient githubClient) {
+    public TechnologyDetectionService(GithubClient githubClient, RepositoryFingerprintService fingerprintService) {
         this.githubClient = githubClient;
+        this.fingerprintService = fingerprintService;
     }
 
     public TechStackDto detectTechStack(Repository repository, String accessToken, String readmeContent, List<String> commitMessages) {
@@ -182,20 +184,50 @@ public class TechnologyDetectionService {
             addIfContains(commitText, "docker", detectedTech, "Docker");
         }
 
+        // ===================== PRIORITY 0: Deterministic Fingerprint (strongest) =====================
+        // Inspect actual file CONTENTS. Strong dependency/config evidence overrides weaker heuristics.
+        com.example.gitpilot.analysis.dto.RepositoryFingerprintDto fingerprint = null;
+        try {
+            fingerprint = fingerprintService.fingerprint(owner, repo, accessToken);
+        } catch (Exception e) {
+            log.warn("[TECH] Fingerprint failed for {}/{}: {}", owner, repo, e.getMessage());
+        }
+
+        String fpPrimaryLanguage = null;
+        if (fingerprint != null && fingerprint.isResolved()) {
+            // Merge fingerprint-detected technologies (strong, content-based evidence) first.
+            if (fingerprint.getLanguages() != null) detectedTech.addAll(fingerprint.getLanguages());
+            if (fingerprint.getBackendFramework() != null) detectedTech.add(fingerprint.getBackendFramework());
+            if (fingerprint.getBackendBuildTool() != null) detectedTech.add(fingerprint.getBackendBuildTool());
+            if (fingerprint.getFrontendFramework() != null) detectedTech.add(fingerprint.getFrontendFramework());
+            if (fingerprint.getFrontendBuildTool() != null) detectedTech.add(fingerprint.getFrontendBuildTool());
+            if (fingerprint.getBackendLibraries() != null) detectedTech.addAll(fingerprint.getBackendLibraries());
+            if (fingerprint.getFrontendLibraries() != null) detectedTech.addAll(fingerprint.getFrontendLibraries());
+            if (fingerprint.getTestingFrameworks() != null) detectedTech.addAll(fingerprint.getTestingFrameworks());
+            if (fingerprint.getDatabase() != null) detectedTech.add(fingerprint.getDatabase());
+            if (fingerprint.isDocker()) detectedTech.add("Docker");
+            if (fingerprint.isDockerCompose()) detectedTech.add("Docker Compose");
+            fpPrimaryLanguage = fingerprint.getPrimaryLanguage();
+        }
+
         // ===================== Determine Primary Language =====================
-        String primaryLanguage = determinePrimaryLanguage(languages, manifestFiles, detectedTech);
+        // Fingerprint primary language wins when resolved (it is derived from build files/deps).
+        String primaryLanguage = (fpPrimaryLanguage != null && !fpPrimaryLanguage.isBlank())
+                ? fpPrimaryLanguage
+                : determinePrimaryLanguage(languages, manifestFiles, detectedTech);
 
         // ===================== Determine Category =====================
         String category = determineCategory(detectedTech, primaryLanguage);
 
-        log.info("[TECH] Final: primaryLanguage={} category={} technologies={} manifests={}",
-                primaryLanguage, category, detectedTech, manifestFiles);
+        log.info("[TECH] Final: primaryLanguage={} category={} technologies={} manifests={} fingerprintResolved={}",
+                primaryLanguage, category, detectedTech, manifestFiles, fingerprint != null && fingerprint.isResolved());
 
         return TechStackDto.builder()
                 .detectedTechnologies(new ArrayList<>(detectedTech))
                 .detectedManifestFiles(manifestFiles.stream().distinct().toList())
                 .primaryLanguage(primaryLanguage)
                 .category(category)
+                .fingerprint(fingerprint)
                 .build();
     }
 

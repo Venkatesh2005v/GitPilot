@@ -78,6 +78,29 @@ public class GithubClient {
         }
     }
 
+    /**
+     * Fetch the raw text content of a single file at the given path. Fails safe: returns "" if the
+     * file is missing or any error occurs, so optional-file inspection never breaks the caller.
+     */
+    public String getFileContent(String owner, String repo, String path, String accessToken) {
+        try {
+            var spec = restClient.get()
+                    .uri("https://api.github.com/repos/{owner}/{repo}/contents/{path}", owner, repo, path)
+                    .header("Accept", "application/vnd.github.raw+json")
+                    .header("User-Agent", "GitPilot-Application");
+
+            if (accessToken != null && !accessToken.isBlank()) {
+                spec = spec.header("Authorization", "Bearer " + accessToken);
+            }
+
+            String result = spec.retrieve().body(String.class);
+            return result != null ? result : "";
+        } catch (Exception e) {
+            log.debug("[GitHubAPI] getFileContent failed for {}/{} path={}: {}", owner, repo, path, e.getMessage());
+            return "";
+        }
+    }
+
     public String getReadme(String owner, String repo, String accessToken) {
         log.info("[GitHubAPI] GET /repos/{}/{}/readme", owner, repo);
         try {

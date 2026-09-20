@@ -16,4 +16,10 @@ public class TechStackDto {
     private List<String> detectedManifestFiles;
     private String primaryLanguage;
     private String category; // e.g. Full-Stack Java/React, Microservice, etc.
+
+    /**
+     * Phase 2: deterministic, evidence-backed technology fingerprint derived from actual file
+     * contents. Additive/optional — existing consumers keep working if this is null.
+     */
+    private RepositoryFingerprintDto fingerprint;
 }
