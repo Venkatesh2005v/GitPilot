@@ -30,6 +30,14 @@ public class SecurityConfig {
     private String allowedOrigins;
 
     /**
+     * Where to send the browser after a successful OAuth2 login. In the split deployment this is
+     * the Vercel frontend URL (set via OAUTH2_SUCCESS_REDIRECT_URI). Defaults to "/" so local
+     * development (same-origin) behavior is unchanged.
+     */
+    @Value("${app.oauth2.success-redirect-uri:/}")
+    private String frontendUrl;
+
+    /**
      * Use HttpSession-backed authorized client repository.
      * This ensures the OAuth2AuthorizedClient (with access token) is stored
      * in the same HTTP session as the OAuth2AuthenticationToken.
@@ -127,6 +135,7 @@ public class SecurityConfig {
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .authorizedClientRepository(authorizedClientRepository)
+                        .defaultSuccessUrl(frontendUrl, true)
                 );
         return http.build();
     }
