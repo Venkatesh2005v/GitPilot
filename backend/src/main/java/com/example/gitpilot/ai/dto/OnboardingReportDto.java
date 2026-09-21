@@ -43,6 +43,22 @@ public class OnboardingReportDto {
     @Builder.Default
     private List<ImplementedFeatureDto> implementedFeatures = new ArrayList<>();
 
+    // ---- Phase 3 expansion: structured Project Foundation (all additive/optional) ----
+    /** Deterministic project overview (tech/db/integrations/infra) built from the fingerprint. */
+    private ProjectOverviewDto projectOverview;
+    /** Capabilities with an explicit status: IMPLEMENTED | PARTIAL | NOT_DETERMINED. */
+    @Builder.Default
+    private List<CapabilityDto> capabilities = new ArrayList<>();
+    /** Concise high-level flow derived from the repository, e.g. "Frontend -> Controller -> Service -> Database". */
+    @Builder.Default
+    private List<String> systemFlow = new ArrayList<>();
+    /** Configuration/environment categories required to run the project (no secret values). */
+    @Builder.Default
+    private List<String> configEnvironment = new ArrayList<>();
+    /** Local setup / getting-started steps derived from actual build/Docker/config evidence. */
+    @Builder.Default
+    private List<String> gettingStartedSteps = new ArrayList<>();
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -61,6 +77,33 @@ public class OnboardingReportDto {
         private String name;
         private String description;
         /** Why this is considered implemented (e.g. "controller class present", "dependency detected"). */
+        private String evidence;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProjectOverviewDto {
+        private String primaryLanguage;
+        private String backend;      // framework + build tool, e.g. "Spring Boot (Maven)"
+        private String frontend;     // framework + build tool, e.g. "React (Vite)"
+        private String database;     // e.g. "PostgreSQL" or null
+        @Builder.Default
+        private List<String> integrations = new ArrayList<>();   // evidence-based
+        @Builder.Default
+        private List<String> infrastructure = new ArrayList<>(); // Docker, Compose, CI
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CapabilityDto {
+        private String name;
+        private String description;
+        /** IMPLEMENTED | PARTIAL | NOT_DETERMINED */
+        private String status;
         private String evidence;
     }
 }

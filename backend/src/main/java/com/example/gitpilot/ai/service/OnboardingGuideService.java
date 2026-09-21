@@ -172,6 +172,8 @@ public class OnboardingGuideService {
             if (parsed.getSuggestedFirstContributions() == null || parsed.getSuggestedFirstContributions().isEmpty()) {
                 parsed.setSuggestedFirstContributions(buildFirstContributionSuggestions(evidence, readme));
             }
+            // Phase 3 expansion: attach deterministic project-foundation sections (never AI-invented).
+            applyProjectFoundation(parsed, fingerprint, evidence, rootFiles, configFiles);
             return parsed;
         } catch (Exception e) {
             log.warn("AI onboarding generation failed for {}: {}. Using deterministic fallback.", repoName, e.getMessage());
@@ -362,7 +364,7 @@ public class OnboardingGuideService {
             learningPath.add(learningPath.size() + 1 + ". Reach out to top contributor: " + contributors.get(0).getAuthorName());
         }
 
-        return OnboardingReportDto.builder()
+        OnboardingReportDto report = OnboardingReportDto.builder()
                 .repositoryId(repo.getId())
                 .repositoryName(repoName)
                 .projectPurpose(purpose)
@@ -382,6 +384,142 @@ public class OnboardingGuideService {
                 .generatedAt(LocalDateTime.now())
                 .isCached(false)
                 .build();
+        // Phase 3 expansion: deterministic project-foundation sections also apply to the fallback.
+        applyProjectFoundation(report, fingerprint, evidence, rootFiles, configFiles);
+        return report;
+    }
+
+    /**
+     * Populate the structured Project Foundation sections (overview, capabilities-with-status,
+     * system flow, config/env, getting-started) purely from deterministic evidence: the Phase 2
+     * fingerprint, Phase 1 evidence, and the repository's root/config files. AI-provided
+     * implementedFeatures are mapped into capabilities as IMPLEMENTED; nothing is invented.
+     */
+    private void applyProjectFoundation(OnboardingReportDto report, RepositoryFingerprintDto fp,
+                                        RepositoryEvidence evidence, List<String> rootFiles, List<String> configFiles) {
+        boolean fpResolved = fp != null && fp.isResolved();
+
+        // A. Project Overview (deterministic from fingerprint).
+        OnboardingReportDto.ProjectOverviewDto.ProjectOverviewDtoBuilder ov = OnboardingReportDto.ProjectOverviewDto.builder();
+        List<String> integrations = new ArrayList<>();
+        List<String> infrastructure = new ArrayList<>();
+        if (fpResolved) {
+            ov.primaryLanguage(fp.getPrimaryLanguage());
+            ov.backend(joinTechTool(fp.getBackendFramework(), fp.getBackendBuildTool()));
+            ov.frontend(joinTechTool(fp.getFrontendFramework(), fp.getFrontendBuildTool()));
+            ov.database(fp.getDatabase());
+            if (fp.isDocker()) infrastructure.add("Docker");
+            if (fp.isDockerCompose()) infrastructure.add("Docker Compose");
+            if (fp.getCiProvider() != null) infrastructure.add(fp.getCiProvider());
+        }
+        // Integrations from evidence: GitHub API is always used by GitPilot repos synced here; add only
+        // when config/deps show it. Keep conservative — infer from config file names, not guesses.
+        if (configFiles.stream().anyMatch(f -> f.equalsIgnoreCase(".env.example"))) {
+            integrations.add("Environment-based external configuration (.env.example present)");
+        }
+        report.setProjectOverview(ov.integrations(integrations).infrastructure(infrastructure).build());
+
+        // B. Capabilities with status. Map AI implementedFeatures -> IMPLEMENTED. Add evidence-based
+        //    infra capabilities (tests/CI/Docker) with PARTIAL/NOT_DETERMINED honesty.
+        List<OnboardingReportDto.CapabilityDto> capabilities = new ArrayList<>();
+        if (report.getImplementedFeatures() != null) {
+            report.getImplementedFeatures().forEach(f -> capabilities.add(
+                    OnboardingReportDto.CapabilityDto.builder()
+                            .name(f.getName()).description(f.getDescription())
+                            .status("IMPLEMENTED").evidence(f.getEvidence()).build()));
+        }
+        boolean evResolved = evidence != null && evidence.isResolved();
+        capabilities.add(capabilityStatus("Automated testing",
+                evResolved ? (evidence.isHasTests() ? "IMPLEMENTED" : "NOT_DETERMINED") : "NOT_DETERMINED",
+                evResolved && evidence.isHasTests() ? "Test directory/files detected" : "No test evidence detected"));
+        capabilities.add(capabilityStatus("Continuous integration",
+                evResolved ? (evidence.isHasCI() ? "IMPLEMENTED" : "NOT_DETERMINED") : "NOT_DETERMINED",
+                evResolved && evidence.isHasCI() ? "CI configuration detected" : "No CI configuration detected"));
+        if (fpResolved && (fp.isDocker() || fp.isDockerCompose())) {
+            capabilities.add(capabilityStatus("Containerized deployment", "IMPLEMENTED",
+                    "Dockerfile/compose detected"));
+        }
+        report.setCapabilities(capabilities);
+
+        // C/D. System Flow (deterministic, only relationships supported by evidence).
+        report.setSystemFlow(buildSystemFlow(fp));
+
+        // G. Configuration / Environment categories (no secret values).
+        report.setConfigEnvironment(buildConfigEnvironment(fp, configFiles));
+
+        // H. Getting Started steps (from actual build/Docker/config evidence).
+        report.setGettingStartedSteps(buildGettingStarted(fp, rootFiles, configFiles));
+    }
+
+    private OnboardingReportDto.CapabilityDto capabilityStatus(String name, String status, String evidence) {
+        return OnboardingReportDto.CapabilityDto.builder()
+                .name(name).status(status).evidence(evidence).description(null).build();
+    }
+
+    private String joinTechTool(String framework, String buildTool) {
+        if (framework == null && buildTool == null) return null;
+        if (framework == null) return buildTool;
+        if (buildTool == null) return framework;
+        return framework + " (" + buildTool + ")";
+    }
+
+    private List<String> buildSystemFlow(RepositoryFingerprintDto fp) {
+        List<String> flow = new ArrayList<>();
+        if (fp == null || !fp.isResolved()) return flow;
+        boolean hasFrontend = fp.getFrontendFramework() != null;
+        boolean hasBackend = fp.getBackendFramework() != null;
+        boolean hasDb = fp.getDatabase() != null;
+        if (hasFrontend && hasBackend && hasDb) {
+            flow.add(fp.getFrontendFramework() + " frontend → " + fp.getBackendFramework() + " backend → " + fp.getDatabase());
+        } else if (hasFrontend && hasBackend) {
+            flow.add(fp.getFrontendFramework() + " frontend → " + fp.getBackendFramework() + " backend");
+        } else if (hasBackend && hasDb) {
+            flow.add(fp.getBackendFramework() + " backend → " + fp.getDatabase());
+        } else if (hasBackend) {
+            flow.add(fp.getBackendFramework() + " backend service");
+        } else if (hasFrontend) {
+            flow.add(fp.getFrontendFramework() + " frontend application");
+        }
+        return flow;
+    }
+
+    private List<String> buildConfigEnvironment(RepositoryFingerprintDto fp, List<String> configFiles) {
+        List<String> cfg = new ArrayList<>();
+        if (fp != null && fp.isResolved() && fp.getDatabase() != null) {
+            cfg.add("Database connection (" + fp.getDatabase() + "): URL, username, password");
+        }
+        if (configFiles.stream().anyMatch(f -> f.equalsIgnoreCase(".env.example"))) {
+            cfg.add("Environment variables defined in .env.example (copy to .env and fill values)");
+        }
+        if (fp != null && fp.isResolved() && fp.getCiProvider() != null) {
+            cfg.add("CI secrets configured in " + fp.getCiProvider());
+        }
+        if (cfg.isEmpty()) cfg.add("No explicit configuration requirements determined from repository evidence.");
+        return cfg;
+    }
+
+    private List<String> buildGettingStarted(RepositoryFingerprintDto fp, List<String> rootFiles, List<String> configFiles) {
+        List<String> steps = new ArrayList<>();
+        steps.add("Clone the repository and open it in your editor.");
+        if (configFiles.stream().anyMatch(f -> f.equalsIgnoreCase(".env.example"))) {
+            steps.add("Copy .env.example to .env and fill in required values.");
+        }
+        boolean docker = fp != null && fp.isResolved() && (fp.isDocker() || fp.isDockerCompose());
+        if (fp != null && fp.isResolved()) {
+            String buildTool = fp.getBackendBuildTool();
+            if ("Maven".equals(buildTool)) steps.add("Build/run the backend: ./mvnw spring-boot:run");
+            else if ("Gradle".equals(buildTool)) steps.add("Build/run the backend: ./gradlew bootRun");
+            else if ("pip".equals(buildTool) || "Poetry".equals(buildTool)) steps.add("Install Python dependencies, then run the backend service.");
+            if (fp.getFrontendBuildTool() != null || rootFiles.contains("package.json")) {
+                steps.add("Install frontend dependencies (npm install) and start the dev server (npm run dev).");
+            }
+            if (fp.isDockerCompose()) steps.add("Alternatively, start all services with: docker compose up");
+            else if (fp.isDocker()) steps.add("Alternatively, build and run the Docker image.");
+        }
+        if (steps.size() == 1) {
+            steps.add("Build/run steps could not be determined from repository evidence; consult the README.");
+        }
+        return steps;
     }
 
     private String cleanJsonResponse(String raw) {

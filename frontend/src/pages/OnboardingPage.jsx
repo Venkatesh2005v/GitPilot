@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, RefreshCw, CheckCircle2, Code2, Layers, Cpu, Sparkles, FileText, ArrowRight } from 'lucide-react';
+import { BookOpen, RefreshCw, CheckCircle2, Code2, Layers, Cpu, Sparkles, FileText, ArrowRight, ShieldCheck } from 'lucide-react';
 import { RepositoryLoader, TopLoadingBar, AnimatedCard } from '../components/RepositoryLoader';
 import { getSummaryText, apiFetch } from '../utils/apiUtils';
 
@@ -188,6 +188,105 @@ export function OnboardingPage({ selectedRepoId }) {
                   </motion.div>
                 )}
               </div>
+            )}
+
+            {/* Project Overview (deterministic from fingerprint) */}
+            {report.projectOverview && (
+              <motion.div variants={cardVariants} className="card-3xl" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+                  <Layers size={20} style={{ color: 'var(--accent-primary)' }} />
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'Space Grotesk' }}>Project Overview</h3>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+                  {[
+                    ['Primary Language', report.projectOverview.primaryLanguage],
+                    ['Backend', report.projectOverview.backend],
+                    ['Frontend', report.projectOverview.frontend],
+                    ['Database', report.projectOverview.database],
+                    ['Integrations', (report.projectOverview.integrations || []).join(', ')],
+                    ['Infrastructure', (report.projectOverview.infrastructure || []).join(', ')],
+                  ].filter(([, v]) => v && String(v).trim().length > 0).map(([label, value], idx) => (
+                    <div key={idx} style={{ padding: '0.75rem 1rem', background: 'var(--bg-secondary)', borderRadius: '1rem', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
+                      <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{value}</strong>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Project Status: capabilities with IMPLEMENTED / PARTIAL / NOT_DETERMINED */}
+            {report.capabilities && report.capabilities.length > 0 && (
+              <motion.div variants={cardVariants} className="card-3xl" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem' }}>
+                  <ShieldCheck size={20} style={{ color: 'var(--accent-teal)' }} />
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'Space Grotesk' }}>Project Status</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {report.capabilities.map((cap, idx) => {
+                    const st = (cap.status || 'NOT_DETERMINED').toUpperCase();
+                    const color = st === 'IMPLEMENTED' ? '#10b981' : st === 'PARTIAL' ? 'var(--accent-yellow, #d69e2e)' : 'var(--text-muted)';
+                    return (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', padding: '0.75rem 1rem', background: 'var(--bg-secondary)', borderRadius: '0.85rem', border: '1px solid var(--border-color)' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{cap.name}</div>
+                          {cap.description && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>{cap.description}</p>}
+                          {cap.evidence && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono' }}>{cap.evidence}</span>}
+                        </div>
+                        <span className="badge" style={{ flexShrink: 0, fontSize: '0.62rem', fontWeight: 700, color, border: `1px solid ${color}` }}>{st.replace('_', ' ')}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+
+            {/* How the System Works + Configuration/Environment */}
+            {((report.systemFlow && report.systemFlow.length > 0) || (report.configEnvironment && report.configEnvironment.length > 0)) && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1.75rem', marginBottom: '2rem' }}>
+                {report.systemFlow && report.systemFlow.length > 0 && (
+                  <motion.div variants={cardVariants} className="card-3xl" style={{ padding: '1.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+                      <Code2 size={20} style={{ color: 'var(--accent-primary)' }} />
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'Space Grotesk' }}>How the System Works</h3>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {report.systemFlow.map((f, idx) => (
+                        <div key={idx} style={{ fontSize: '0.9rem', fontFamily: 'JetBrains Mono', color: 'var(--text-primary)', padding: '0.6rem 0.85rem', background: 'var(--bg-secondary)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>{f}</div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+                {report.configEnvironment && report.configEnvironment.length > 0 && (
+                  <motion.div variants={cardVariants} className="card-3xl" style={{ padding: '1.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+                      <FileText size={20} style={{ color: 'var(--accent-teal)' }} />
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'Space Grotesk' }}>Configuration & Environment</h3>
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.8 }}>
+                      {report.configEnvironment.map((c, idx) => <li key={idx}>{c}</li>)}
+                    </ul>
+                  </motion.div>
+                )}
+              </div>
+            )}
+
+            {/* Local Setup / Getting Started */}
+            {report.gettingStartedSteps && report.gettingStartedSteps.length > 0 && (
+              <motion.div variants={cardVariants} className="card-3xl" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+                  <BookOpen size={20} style={{ color: 'var(--accent-primary)' }} />
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'Space Grotesk' }}>Getting Started</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {report.gettingStartedSteps.map((step, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.85rem', borderRadius: '0.85rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-primary)', fontFamily: 'JetBrains Mono', flexShrink: 0 }}>{idx + 1}</span>
+                      <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
             )}
 
             {/* Implemented Capabilities (evidence-backed) */}

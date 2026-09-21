@@ -197,6 +197,45 @@ class OnboardingGuideServiceTest {
         assertFalse(report.getRecommendedLearningPath().isEmpty()); // deterministic learning path still present
     }
 
+    // Phase 3 expansion: deterministic project-foundation sections populate from the fingerprint.
+    @Test
+    void projectFoundationSectionsPopulatedFromFingerprint() {
+        when(fingerprintService.fingerprint(any(), any(), any())).thenReturn(resolvedSpringReactFingerprint());
+        when(repositoryEvidenceService.detect(any(), any(), any(), any()))
+                .thenReturn(RepositoryEvidence.builder().resolved(true).hasTests(true).hasCI(false).hasDocker(true).build());
+        when(aiGatewayService.generateInsightWithFailover(any())).thenReturn(new AIGatewayService.AIResult(
+                "{\"projectPurpose\":\"p\",\"implementedFeatures\":[{\"name\":\"OAuth\",\"description\":\"login\",\"evidence\":\"SecurityConfig\"}]}",
+                "Gemini", "m", "None"));
+
+        OnboardingReportDto report = service.getOrGenerateOnboardingGuide(REPO_ID, true, "tok");
+
+        // A. Overview built from fingerprint.
+        assertNotNull(report.getProjectOverview());
+        assertEquals("Java", report.getProjectOverview().getPrimaryLanguage());
+        assertEquals("Spring Boot (Maven)", report.getProjectOverview().getBackend());
+        assertEquals("React (Vite)", report.getProjectOverview().getFrontend());
+        assertEquals("PostgreSQL", report.getProjectOverview().getDatabase());
+        assertTrue(report.getProjectOverview().getInfrastructure().contains("Docker"));
+
+        // B. Capabilities include AI feature (IMPLEMENTED) + evidence-based status entries.
+        assertFalse(report.getCapabilities().isEmpty());
+        assertTrue(report.getCapabilities().stream()
+                .anyMatch(c -> "OAuth".equals(c.getName()) && "IMPLEMENTED".equals(c.getStatus())));
+        assertTrue(report.getCapabilities().stream()
+                .anyMatch(c -> "Automated testing".equals(c.getName()) && "IMPLEMENTED".equals(c.getStatus())));
+        // CI not detected -> NOT_DETERMINED (never fabricated as missing/incomplete beyond evidence).
+        assertTrue(report.getCapabilities().stream()
+                .anyMatch(c -> "Continuous integration".equals(c.getName()) && "NOT_DETERMINED".equals(c.getStatus())));
+
+        // C/D. System flow derived (frontend -> backend -> db).
+        assertFalse(report.getSystemFlow().isEmpty());
+        assertTrue(report.getSystemFlow().get(0).contains("React"));
+        assertTrue(report.getSystemFlow().get(0).contains("PostgreSQL"));
+
+        // H. Getting started references the real build tool.
+        assertTrue(report.getGettingStartedSteps().stream().anyMatch(s -> s.contains("mvnw")));
+    }
+
     // 12. Existing report fields remain populated/compatible.
     @Test
     void existingFieldsRemainCompatible() {
