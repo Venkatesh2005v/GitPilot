@@ -2,6 +2,7 @@ package com.example.gitpilot.commit.service;
 
 import com.example.gitpilot.commit.dto.ChangedFileDto;
 import com.example.gitpilot.commit.dto.CommitDetailDto;
+import com.example.gitpilot.commit.dto.TechnicalImpactDto;
 import com.example.gitpilot.github.client.GithubClient;
 import com.example.gitpilot.github.dto.GithubCommitDetailResponse;
 import com.example.gitpilot.repository.entity.Repository;
@@ -85,17 +86,21 @@ public class CommitDetailService {
             }
         }
 
+        int additions = stats != null && stats.getAdditions() != null ? stats.getAdditions() : 0;
+        int deletions = stats != null && stats.getDeletions() != null ? stats.getDeletions() : 0;
+
         return CommitDetailDto.builder()
                 .sha(gh.getSha() != null ? gh.getSha() : requestedSha)
                 .message(commit != null ? commit.getMessage() : null)
                 .authorName(author != null ? author.getName() : null)
                 .authorEmail(author != null ? author.getEmail() : null)
                 .date(author != null ? author.getDate() : null)
-                .additions(stats != null && stats.getAdditions() != null ? stats.getAdditions() : 0)
-                .deletions(stats != null && stats.getDeletions() != null ? stats.getDeletions() : 0)
+                .additions(additions)
+                .deletions(deletions)
                 .changedFileCount(files.size())
                 .htmlUrl(gh.getHtmlUrl())
                 .files(files)
+                .technicalImpact(computeTechnicalImpact(files, additions, deletions))
                 .build();
     }
 
@@ -115,6 +120,66 @@ public class CommitDetailService {
                 .previousFilename(f.getPreviousFilename())
                 .patch(patch)                 // null stays null (binary/omitted)
                 .patchTruncated(truncated)
+                .blobUrl(f.getBlobUrl())
+                .build();
+    }
+
+    /**
+     * Deterministic technical impact derived ONLY from changed-file paths/extensions. No AI,
+     * no speculation. When nothing can be classified, returns an explicit "Not determined" state.
+     */
+    TechnicalImpactDto computeTechnicalImpact(List<ChangedFileDto> files, int additions, int deletions) {
+        java.util.LinkedHashSet<String> areas = new java.util.LinkedHashSet<>();
+        java.util.LinkedHashSet<String> techs = new java.util.LinkedHashSet<>();
+
+        for (ChangedFileDto f : files) {
+            String path = f.getFilename() != null ? f.getFilename().toLowerCase() : "";
+            if (path.isEmpty()) continue;
+
+            // Area classification (path/name based).
+            if (path.startsWith(".github/workflows/") || path.equals(".gitlab-ci.yml") || path.equalsIgnoreCase("jenkinsfile")) areas.add("CI/CD");
+            else if (path.contains("dockerfile") || path.startsWith("docker-compose") || path.contains("/k8s/") || path.endsWith(".tf")) areas.add("Infrastructure");
+            else if (path.contains("/test/") || path.contains("/tests/") || path.contains("__tests__") || path.matches(".*\\.(test|spec)\\.[jt]sx?$") || path.matches(".*(test_|_test)\\.py$")) areas.add("Testing");
+            else if (path.matches(".*\\.(md|mdx|rst|txt|adoc)$")) areas.add("Documentation");
+            else if (path.matches(".*\\.(sql)$") || path.contains("/migration/") || path.contains("/db/")) areas.add("Database");
+            else if (path.matches(".*\\.(properties|ya?ml|toml|ini|env|cfg|conf)$") || path.contains(".env")) areas.add("Configuration");
+            else if (path.matches(".*\\.(jsx?|tsx?|vue|css|scss|html)$") || path.contains("/frontend/") || path.contains("/src/components/") || path.contains("/src/pages/")) areas.add("Frontend");
+            else if (path.matches(".*\\.(java|kt|kts|go|rb|cs|php)$") || path.contains("/backend/") || path.contains("/src/main/")) areas.add("Backend");
+
+            // Technology classification (extension based; only concrete file types).
+            if (path.endsWith(".java")) techs.add("Java");
+            else if (path.endsWith(".kt") || path.endsWith(".kts")) techs.add("Kotlin");
+            else if (path.endsWith(".ts") || path.endsWith(".tsx")) techs.add("TypeScript");
+            else if (path.endsWith(".js") || path.endsWith(".jsx")) techs.add("JavaScript");
+            else if (path.endsWith(".py")) techs.add("Python");
+            else if (path.endsWith(".go")) techs.add("Go");
+            else if (path.endsWith(".sql")) techs.add("SQL");
+            else if (path.endsWith(".css") || path.endsWith(".scss")) techs.add("CSS");
+        }
+
+        String architecturalArea;
+        if (areas.contains("Backend") && areas.contains("Frontend")) architecturalArea = "Full-stack (backend + frontend layers)";
+        else if (areas.contains("Backend")) architecturalArea = "Backend service layer";
+        else if (areas.contains("Frontend")) architecturalArea = "Frontend/UI layer";
+        else if (areas.contains("Database")) architecturalArea = "Data/persistence layer";
+        else if (areas.contains("Infrastructure") || areas.contains("CI/CD")) architecturalArea = "Build/deployment layer";
+        else if (!areas.isEmpty()) architecturalArea = String.join(", ", areas);
+        else architecturalArea = "Not determined";
+
+        String summary;
+        if (files.isEmpty()) {
+            summary = "No changed files reported for this commit.";
+        } else if (areas.isEmpty()) {
+            summary = "Changed " + files.size() + " file(s) (+" + additions + "/-" + deletions + "). Affected area not determined from file paths.";
+        } else {
+            summary = "Changed " + files.size() + " file(s) across " + String.join(", ", areas) + " (+" + additions + "/-" + deletions + ").";
+        }
+
+        return TechnicalImpactDto.builder()
+                .affectedAreas(new ArrayList<>(areas))
+                .technologies(new ArrayList<>(techs))
+                .architecturalArea(architecturalArea)
+                .summary(summary)
                 .build();
     }
 

@@ -109,5 +109,8 @@ public class GithubCommitDetailResponse {
 
         @JsonProperty("previous_filename")
         private String previousFilename;
+
+        @JsonProperty("blob_url")
+        private String blobUrl;
     }
 }

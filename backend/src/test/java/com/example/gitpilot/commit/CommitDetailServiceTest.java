@@ -49,7 +49,7 @@ class CommitDetailServiceTest {
     }
 
     private GithubCommitDetailResponse.File file(String name, String status, int add, int del, String patch, String prev) {
-        return new GithubCommitDetailResponse.File(name, status, add, del, add + del, patch, prev);
+        return new GithubCommitDetailResponse.File(name, status, add, del, add + del, patch, prev, null);
     }
 
     private GithubCommitDetailResponse sample(List<GithubCommitDetailResponse.File> files, int add, int del) {
@@ -185,6 +185,57 @@ class CommitDetailServiceTest {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> service.getCommitDetail(REPO_ID, "  ", TOKEN));
         assertEquals(400, ex.getStatusCode().value());
+    }
+
+    // Enhancement: complete vs truncated patch flags on the mapped files.
+    @Test
+    void completeAndNullPatchFlags() {
+        when(githubClient.getCommitDetail(any(), any(), any(), any())).thenReturn(
+                sample(List.of(
+                        file("A.java", "modified", 2, 1, "@@ small @@", null),   // complete
+                        file("logo.png", "added", 0, 0, null, null)              // null patch
+                ), 2, 1));
+        CommitDetailDto dto = service.getCommitDetail(REPO_ID, SHA, TOKEN);
+        assertFalse(dto.getFiles().get(0).isPatchTruncated());
+        assertNotNull(dto.getFiles().get(0).getPatch());
+        assertNull(dto.getFiles().get(1).getPatch());
+        assertFalse(dto.getFiles().get(1).isPatchTruncated());
+    }
+
+    // Enhancement: deterministic technical-impact classification from file paths.
+    @Test
+    void technicalImpactClassifiesAreasAndTechnologies() {
+        when(githubClient.getCommitDetail(any(), any(), any(), any())).thenReturn(
+                sample(List.of(
+                        file("backend/src/main/java/App.java", "modified", 10, 2, "@@ @@", null),
+                        file("frontend/src/pages/Home.tsx", "modified", 5, 1, "@@ @@", null),
+                        file("db/migration/V9__x.sql", "added", 3, 0, "@@ @@", null),
+                        file(".github/workflows/ci.yml", "added", 8, 0, "@@ @@", null)
+                ), 26, 3));
+        CommitDetailDto dto = service.getCommitDetail(REPO_ID, SHA, TOKEN);
+        var impact = dto.getTechnicalImpact();
+        assertNotNull(impact);
+        assertTrue(impact.getAffectedAreas().contains("Backend"));
+        assertTrue(impact.getAffectedAreas().contains("Frontend"));
+        assertTrue(impact.getAffectedAreas().contains("Database"));
+        assertTrue(impact.getAffectedAreas().contains("CI/CD"));
+        assertTrue(impact.getTechnologies().contains("Java"));
+        assertTrue(impact.getTechnologies().contains("TypeScript"));
+        assertTrue(impact.getTechnologies().contains("SQL"));
+        assertEquals("Full-stack (backend + frontend layers)", impact.getArchitecturalArea());
+        assertTrue(impact.getSummary().contains("+26/-3"));
+    }
+
+    // Enhancement: unclassifiable paths -> "Not determined", never invented.
+    @Test
+    void technicalImpactNotDeterminedForUnknownPaths() {
+        when(githubClient.getCommitDetail(any(), any(), any(), any())).thenReturn(
+                sample(List.of(file("LICENSE", "modified", 1, 1, "@@ @@", null)), 1, 1));
+        CommitDetailDto dto = service.getCommitDetail(REPO_ID, SHA, TOKEN);
+        var impact = dto.getTechnicalImpact();
+        assertNotNull(impact);
+        assertTrue(impact.getAffectedAreas().isEmpty());
+        assertEquals("Not determined", impact.getArchitecturalArea());
     }
 
     // 13. Only repositoryId + sha are inputs; owner/repo cannot be injected (derived from stored htmlUrl).

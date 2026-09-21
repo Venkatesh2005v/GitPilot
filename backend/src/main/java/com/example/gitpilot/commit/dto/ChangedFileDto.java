@@ -21,4 +21,5 @@ public class ChangedFileDto {
     private String previousFilename;  // nullable; set only for renames
     private String patch;             // nullable; null for binary/omitted diffs
     private boolean patchTruncated;   // true when a very large patch was truncated server-side
+    private String blobUrl;           // nullable; GitHub file blob URL for "open full diff"
 }

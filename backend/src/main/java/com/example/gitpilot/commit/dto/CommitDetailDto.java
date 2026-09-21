@@ -26,4 +26,6 @@ public class CommitDetailDto {
     private int changedFileCount;
     private String htmlUrl;
     private List<ChangedFileDto> files;
+    /** Deterministic technical impact derived from changed-file paths. */
+    private TechnicalImpactDto technicalImpact;
 }

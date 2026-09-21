@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GitCommit, User, Clock, Plus, Minus, FileText, X, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
+import { GitCommit, User, Clock, Plus, Minus, FileText, X, ChevronDown, ChevronRight, ExternalLink, Zap } from 'lucide-react';
 import { Skeleton } from './Skeleton';
 
 const STATUS_STYLE = {
@@ -18,9 +18,11 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function FileRow({ file }) {
+function FileRow({ file, commitUrl }) {
   const [expanded, setExpanded] = useState(false);
   const s = statusStyle(file.status);
+  // Prefer the file's GitHub blob URL; fall back to the commit page when unavailable.
+  const fullDiffUrl = file.blobUrl || commitUrl || null;
   return (
     <div style={{ border: '1px solid var(--border-color)', borderRadius: '0.85rem', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
       <div
@@ -65,15 +67,33 @@ function FileRow({ file }) {
                   return <div key={i} style={{ color }}>{line || ' '}</div>;
                 })}
               </pre>
-              {file.patchTruncated && (
-                <div style={{ padding: '0.5rem 0.85rem', fontSize: '0.72rem', color: 'var(--accent-yellow, #d69e2e)', borderTop: '1px solid var(--border-color)' }}>
-                  Diff truncated — this file's patch was too large to display fully.
-                </div>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.5rem 0.85rem', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
+                {file.patchTruncated ? (
+                  <span style={{ fontSize: '0.72rem', color: 'var(--accent-yellow, #d69e2e)' }}>
+                    ⚠ Diff truncated — showing the first portion of a large patch.
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.72rem', color: 'var(--accent-green)' }}>
+                    Complete diff shown.
+                  </span>
+                )}
+                {fullDiffUrl && (
+                  <a href={fullDiffUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--accent-primary)', textDecoration: 'none' }}>
+                    <ExternalLink size={12} /> Open full diff on GitHub
+                  </a>
+                )}
+              </div>
             </>
           ) : (
-            <div style={{ padding: '0.85rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Diff unavailable for this file.
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.85rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Diff unavailable for this file (binary or not provided by GitHub).
+              </span>
+              {fullDiffUrl && (
+                <a href={fullDiffUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--accent-primary)', textDecoration: 'none' }}>
+                  <ExternalLink size={12} /> Open on GitHub
+                </a>
+              )}
             </div>
           )}
         </div>
@@ -140,15 +160,36 @@ export function CommitDetailPanel({ loading, error, detail, onClose, onRetry }) 
             </span>
           </div>
 
-          {/* Deterministic technical impact summary */}
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-            Modified {detail.changedFileCount ?? (detail.files ? detail.files.length : 0)} file(s), +{detail.additions ?? 0}/-{detail.deletions ?? 0} lines.
-          </p>
+          {/* Deterministic Technical Impact (evidence-based, never invented) */}
+          {detail.technicalImpact && (
+            <div style={{ padding: '1rem 1.15rem', borderRadius: '1rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                <Zap size={15} style={{ color: 'var(--accent-primary)' }} />
+                <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>Technical Impact</strong>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 0.6rem 0', lineHeight: 1.5 }}>
+                {detail.technicalImpact.summary}
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {(detail.technicalImpact.affectedAreas || []).map((a, i) => (
+                  <span key={'a' + i} className="badge badge-primary" style={{ fontSize: '0.65rem' }}>{a}</span>
+                ))}
+                {(detail.technicalImpact.technologies || []).map((t, i) => (
+                  <span key={'t' + i} className="badge badge-teal" style={{ fontSize: '0.65rem' }}>{t}</span>
+                ))}
+              </div>
+              {detail.technicalImpact.architecturalArea && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.6rem' }}>
+                  Architectural area: <strong style={{ color: 'var(--text-secondary)' }}>{detail.technicalImpact.architecturalArea}</strong>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Changed files */}
           {detail.files && detail.files.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              {detail.files.map((f, idx) => <FileRow key={idx} file={f} />)}
+              {detail.files.map((f, idx) => <FileRow key={idx} file={f} commitUrl={detail.htmlUrl} />)}
             </div>
           ) : (
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No changed files reported for this commit.</p>
